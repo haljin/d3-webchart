@@ -1,0 +1,75 @@
+a, a:visited, a:active {
+  color: #444;
+}
+
+#vis {
+  width: 940px;
+  height: 600px;
+  clear: both;
+  margin-bottom: 10px;
+
+}
+
+footer {
+  text-align: center;
+}
+
+#view_selection {
+  margin-top: 10px;
+}
+
+.years {
+  font-size: 21px;
+  fill: #aaa;
+}
+
+.tooltip {
+	position: absolute;
+	top: 100px;
+	left: 100px;
+  -moz-border-radius:5px;
+	border-radius: 5px;
+  border: 2px solid #000;
+	/* background: #222222; */
+  background: #fff;
+	opacity: .9;
+	/* color: #eeeeee; */
+  color: black;
+	padding: 10px;
+	width: 300px;
+	font-size: 12px;
+	z-index: 10;
+}
+
+.tooltip .title {
+	font-size: 13px;
+}
+
+.tooltip .name {
+  font-weight:bold;
+}
+
+#easy-as-pie-chart {
+  border: 1px solid gray;
+  font: 10px sans-serif;
+  height: 300px;
+  text-shadow: none;
+  width: 450px;
+}
+#easy-as-pie-chart .total{
+  font-size: 18px;
+  font-weight: bold;
+}
+#easy-as-pie-chart .units{
+  fill: gray;
+  font-size: 12px;
+}
+#easy-as-pie-chart .label{
+  fill: #CCC;
+  font-size: 12px;
+  font-weight: bold;
+}
+#easy-as-pie-chart .value{
+  font-size: 12px;
+  font-weight: bold;
+}​
