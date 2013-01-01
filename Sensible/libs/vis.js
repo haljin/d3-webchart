@@ -133,7 +133,10 @@ BubbleChart = (function() {
 		.attr("cx",this.center.x)
 		.attr("cy",this.center.y)
 		.duration(2000)
-		.attr("r", 100);
+		.attr("r", 100)
+		.each('end',function(){
+				chart.draw_pie_chart(chart);
+		});
 	};
 	
 	BubbleChart.prototype.unzoom_circle = function(d) {	
@@ -154,15 +157,55 @@ BubbleChart = (function() {
 		.attr("cx",this.clicked.x)
 		.attr("cy",this.clicked.y)
 		.attr("r", 0)
-		.duration(2000);
-		
-		setTimeout(function(){
+		.duration(2000)
+		.each('end',function(){
 			new_circle.remove();
-		}, 2000);
+		});
 		
 	};
 	
-
+	BubbleChart.prototype.draw_pie_chart = function(chart) {
+		
+		var radius =100;
+		alert("lol");
+		var color = d3.scale.ordinal()
+		.range(["#98abc5", "#8a89a6", "#7b6888", "#6b486b", "#a05d56", "#d0743c", "#ff8c00"]);
+		
+		var arc = d3.svg.arc()
+		.outerRadius(radius - 10)
+		.innerRadius(0);
+		
+		var pie = d3.layout.pie()
+		.sort(null)
+		.value(function(d) { return d.population; });
+		
+		var svg = chart.vis
+		.append("g")
+		.attr("transform", "translate(50,50)");
+		
+		d3.csv("data/data.csv", function(data) {		
+			data.forEach(function(d) {
+				d.population = +d.population;
+			});
+			
+			var g = svg.selectAll(".arc")
+			.data(pie(data))
+			.enter().append("g")
+			.attr("class", "arc");
+			
+			g.append("path")
+			.attr("d", arc)
+			.style("fill", function(d) { return color(d.data.age); });
+			
+			g.append("text")
+			.attr("transform", function(d) { return "translate(" + arc.centroid(d) + ")"; })
+			.attr("dy", ".35em")
+			.style("text-anchor", "middle")
+			.text(function(d) { return d.data.age; });
+		
+		});
+	};
+	
 	BubbleChart.prototype.charge = function(d) {
 		return -Math.pow(d.radius, 2.0) / 8;
 	};
@@ -247,9 +290,7 @@ BubbleChart = (function() {
 			content += "<span class=\"name\">Year:</span><span class=\"value\"> " + data.year + "</span>";
 			return this.tooltip.showTooltip(content, d3.event);
 		}
-	};
-	
-	
+	};	
 	
 	BubbleChart.prototype.hide_details = function(data, i, element) {
 		var _this = this;
