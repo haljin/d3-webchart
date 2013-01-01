@@ -174,7 +174,7 @@ BubbleChart = (function() {
 		.range(["#98abc5", "#8a89a6", "#7b6888", "#6b486b", "#a05d56", "#d0743c", "#ff8c00"]);
 		
 		var arc = d3.svg.arc()
-		.outerRadius(radius - 10)
+		.outerRadius(radius)
 		.innerRadius(0);
 		
 		var pie = d3.layout.pie()
@@ -205,13 +205,58 @@ BubbleChart = (function() {
       			return function(t) {
           			return arc(interpolation(t));
       			};
-			});
+			})
+			.each("end", function(){
+          		this._listenToEvents = true;
+        	});
+      
+    	 	var paths = g.selectAll("path");
+			 
+      		
+      		paths
+            .on("mouseover", function(d){ 
+                 // Mouseover effect if no transition has started                
+                if(this._listenToEvents){
+                  // Calculate angle bisector
+                  var ang = d.startAngle + (d.endAngle - d.startAngle)/2; 
+                  // Transformate to SVG space
+                  ang = (ang - (Math.PI / 2) ) * -1;
+
+                  // Calculate a 10% radius displacement
+                  var x = Math.cos(ang) * radius * 0.1;
+                  var y = Math.sin(ang) * radius * -0.1;
+
+                  d3.select(this).transition()
+                    .duration(250).attr("transform", "translate("+x+","+y+")"); 
+                }
+              })
+            .on("mouseout", function(d){
+              // Mouseout effect if no transition has started                
+              if(this._listenToEvents){
+                d3.select(this).transition()
+                  .duration(150).attr("transform", "translate(0,0)"); 
+              }
+            });
 			
 			g.append("text")
-			.attr("transform", function(d) { return "translate(" + arc.centroid(d) + ")"; })
-			.attr("dy", ".35em")
-			.style("text-anchor", "middle")
-			.text(function(d) { return d.data.age; });
+			.attr("x", 300)
+			.attr("y",function(d,i){
+				return 150+i*15;
+				})
+			.text(function(d) { 
+				return d.data.age; 
+			});
+			
+			g.append("circle")
+			.attr("cx",290)
+			.attr("cy",function(d,i){
+				return 145+i*15;
+				})
+			.attr("r",5)
+			.attr("stroke", "#000")
+        	.attr("stroke-width", 1)
+			.attr("fill", function(d) { return color(d.data.age); })
+			;
 		
 		});
 	};
