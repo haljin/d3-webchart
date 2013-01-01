@@ -8,6 +8,7 @@ BubbleChart = (function() {
 		this.data = data;
 		this.width = 940;
 		this.height = 600;
+		this.zoomed_radius=100;
 		this.tooltip = CustomTooltip("gates_tooltip", 240);
 		this.center = {
 			x: this.width / 2,
@@ -33,6 +34,7 @@ BubbleChart = (function() {
 		this.nodes = [];
 		this.force = null;
 		this.circles = null;
+		
 		this.fill_color = d3.scale.ordinal().domain(["low", "medium", "high"]).range(["#d84b2a", "#beccae", "#7aa25c"]);
 		
 		max_amount = d3.max(this.data, function(d) {
@@ -133,7 +135,7 @@ BubbleChart = (function() {
 		.attr("cx",this.center.x)
 		.attr("cy",this.center.y)
 		.duration(2000)
-		.attr("r", 100)
+		.attr("r", chart.zoomed_radius)
 		.each('end',function(){
 				chart.draw_pie_chart(chart);
 		});
@@ -166,8 +168,8 @@ BubbleChart = (function() {
 	
 	BubbleChart.prototype.draw_pie_chart = function(chart) {
 		
-		var radius =100;
-		alert("lol");
+		var radius = chart.zoomed_radius;
+
 		var color = d3.scale.ordinal()
 		.range(["#98abc5", "#8a89a6", "#7b6888", "#6b486b", "#a05d56", "#d0743c", "#ff8c00"]);
 		
@@ -181,7 +183,7 @@ BubbleChart = (function() {
 		
 		var svg = chart.vis
 		.append("g")
-		.attr("transform", "translate(50,50)");
+		.attr("transform", "translate(" + this.center.x+ "," +this.center.y + ")");
 		
 		d3.csv("data/data.csv", function(data) {		
 			data.forEach(function(d) {
@@ -195,7 +197,15 @@ BubbleChart = (function() {
 			
 			g.append("path")
 			.attr("d", arc)
-			.style("fill", function(d) { return color(d.data.age); });
+			.style("fill", function(d) { return color(d.data.age); })
+			.transition().duration(1000).attrTween("d", function(data)
+			{
+      			var interpolation = d3.interpolate({startAngle: 0, endAngle: 0}, data);
+      			this._current = interpolation(0);
+      			return function(t) {
+          			return arc(interpolation(t));
+      			};
+			});
 			
 			g.append("text")
 			.attr("transform", function(d) { return "translate(" + arc.centroid(d) + ")"; })
@@ -306,6 +316,16 @@ BubbleChart = (function() {
 
 })();
 
+
+ function tweenIn(data) {
+      var interpolation = d3.interpolate({startAngle: 0, endAngle: 0}, data);
+      this._current = interpolation(0);
+      return function(t) {
+          return arc(interpolation(t));
+      };
+    }
+	
+	
 root = typeof exports !== "undefined" && exports !== null ? exports : this;
 
 $(function() {
