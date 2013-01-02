@@ -29,13 +29,13 @@ BubbleChart = (function() {
 		this.zoomed_radius=200;
 		this.vis = null;
 		this.force = null;
-		this.colors = ["#d84b2a", "#beccae", "#7aa25c"];
+		this.colors = ["#b1f413", "#ffd314", "#7f1ac3"];
 		this.fill_color = d3.scale.ordinal().domain(["call", "sms", "bt"]).range(this.colors);
 		this.radius_scale;
 		
 		//Data fields
 		this.token = token;
-		this.baseUrl = "http://localhost:8000/Sensible/data"
+		this.baseUrl = "http://localhost:8000/data"
 		this.callData;
 		this.smsData;
 		this.btData;
@@ -70,6 +70,7 @@ BubbleChart = (function() {
 		});		
 		//Load SMS probe data
 		d3.json(chart.baseUrl + "/sms/" + chart.token,  function(data) { 
+
 			if(!runOnce[1])
 			{
 				runOnce[1] = true;
@@ -87,7 +88,10 @@ BubbleChart = (function() {
 				if (!--remaining )
 					chart.create_nodes();
 			}
+
+		chart.show_loading_screen();
 		});	
+
 	};
 	
 	
@@ -221,6 +225,7 @@ BubbleChart = (function() {
 			return b.value - a.value;
 		});
 		
+		chart.hide_loading_screen();
 		chart.create_vis();
 		chart.start();
 		return chart.display_group_all();
@@ -368,7 +373,7 @@ BubbleChart = (function() {
 		var color = d3.scale.ordinal()
 		.range(this.colors);		
 		var data = [{value:30, label: "Calls"}, {value:30, label: "SMS"}, {value:30, label: "Bluetooth"}];
-		
+
 		var arc = d3.svg.arc()
 		.outerRadius(radius)
 		.innerRadius(0);		
@@ -612,8 +617,82 @@ BubbleChart = (function() {
 		}
 		return this.tooltip.hideTooltip();
 		};	
-	return BubbleChart;
+		
+		
+	BubbleChart.prototype.show_loading_screen = function() {
+		var w = 460,
+		h = 200,
+		x = d3.scale.ordinal().domain(d3.range(3)).rangePoints([0, w], 2);
+		var previous ={};
+		var ascending = true;
+		var fields =
+		{endAngle: 0.0, startAngle: 0.0};
+		
+		var arc = d3.svg.arc()
+		.innerRadius(50)
+		.outerRadius(90)
+		.startAngle(function(d) { return d.startAngle; })
+		.endAngle(function(d) { return d.endAngle; });
+		
+		var load_screen = d3.select("#vis").append("svg").attr("width", this.width).attr("height", this.height).attr("id", "svg_load");
+		var svg =  load_screen
+		.append("g")
+		.attr("transform", "translate(" + this.center.x + "," + this.center.y + ")");
+		
+		setInterval(function() {
+		previous = {endAngle: fields.endAngle, startAngle: fields.startAngle};
+		if (fields.endAngle >= 2*Math.PI)
+		{  
+			ascending = false;
+		}
+		if (fields.startAngle >= 2*Math.PI)
+		{
+			fields.startAngle = 0;
+			fields.endAngle = 0;
+			ascending = true;
+		}
+		else
+		{
+			if (ascending)
+				fields.endAngle += Math.PI /10;
+			else
+				fields.startAngle += Math.PI/10;
+				
+			var path = svg.selectAll("path")
+			.data([fields]);
+			
+			path.enter().append("path")
+			.attr("id", "swizzle")
+			//.attr("transform", function(d, i) { return "translate(" + x(i) + ",0)"; })
+			.transition()
+			.attrTween("d", arcTween);
+			
+			path.transition()		
+			.attrTween("d", arcTween);
+		}
+		
+		
+		
+		
+		
+		}, 150);
+		
+		function arcTween(b) {
+		var i = d3.interpolate(previous,b);
+		this._current = i(0);
+		return function(t) {
+		return arc(i(t));
+		};
+		}
+	};
 
+	BubbleChart.prototype.hide_loading_screen = function() {
+		d3.select("#svg_load").remove();
+	};	
+		
+	return BubbleChart;
+	
+	
 })();
 
 
