@@ -1,17 +1,11 @@
 var BubbleChart, root,blocked=false;
 
 BubbleChart = (function() {
-	function BubbleChart(callData, smsData, btData) {	
-		var max_amount;	
-		this.zoomed = false;
-		this.clicked = null;
-		this.callData = callData;
-		this.smsData = smsData;
-		this.btData = btData;
+	function BubbleChart() {	
+	
+		//Layout fields
 		this.width = 940;
 		this.height = 600;
-		this.zoomed_radius=100;
-		this.tooltip = CustomTooltip("gates_tooltip", 240);
 		this.center = {
 			x: this.width / 2,
 			y: this.height / 2
@@ -32,23 +26,68 @@ BubbleChart = (function() {
 		};
 		this.layout_gravity = -0.01;
 		this.damper = 0.1;
+		this.zoomed_radius=100;
 		this.vis = null;
-		this.nodes = [];
 		this.force = null;
-		this.circles = null;
-		
 		this.fill_color = d3.scale.ordinal().domain(["low", "medium", "high"]).range(["#d84b2a", "#beccae", "#7aa25c"]);
+		this.radius_scale;
 		
-		max_amount = d3.max(this.callData, function(d) {
-			return d.call.duration;
-		});
+		//Data fields
+		this.callData;
+		this.smsData;
+		this.btData;
+		this.nodes = [];
 		
-		this.radius_scale = d3.scale.pow().exponent(0.5).domain([0, max_amount]).range([2, 85]);
+		//Control fields		
+		this.zoomed = false;
+		this.clicked = null;		
+		this.tooltip = CustomTooltip("gates_tooltip", 240);		
+		this.circles = null;	
+		this.startTime;
+		this.endTime;
+			
 		
-		
-		this.create_nodes();
-		this.create_vis();
+		this.load_data(this.startTime, this.endTime);
+
 	}
+	
+	BubbleChart.prototype.load_data = function(start, end){
+		var chart = this;
+		var remaining = 3;
+		var runOnce1 = false, runOnce2 = false, runOnce3 = false;
+		
+		d3.json("http://localhost:8000/Sensible/data/call_log/cf6b8394-cd5c-4431-a5f0-cfeee033262e",  function(data) { 
+			if(!runOnce1)
+			{
+				runOnce1 = true;
+				chart.callData = data;
+				if (!--remaining )
+					chart.create_nodes();
+			}
+		});		
+			
+		d3.json("http://localhost:8000/Sensible/data/sms/cf6b8394-cd5c-4431-a5f0-cfeee033262e",  function(data) { 
+			if(!runOnce2)
+			{
+				runOnce2 = true;
+				chart.smsData = data;
+				if (!--remaining )
+					chart.create_nodes();
+			}
+		});			
+				
+		d3.json("http://localhost:8000/Sensible/data/bluetooth/cf6b8394-cd5c-4431-a5f0-cfeee033262e",  function(data) { 
+			if(!runOnce3)
+			{
+				runOnce3 = true;
+				chart.btData = data;
+				if (!--remaining )
+					chart.create_nodes();
+			}
+		});
+	
+	};
+	
 	
 	BubbleChart.prototype.create_nodes = function() {
 		var chart = this;
@@ -56,7 +95,8 @@ BubbleChart = (function() {
 		var extractNumber = function(hash) {
 			return hash.substring(16, hash.length-2)
 		}
-		this.callData.forEach(function(d) {
+		
+		chart.callData.forEach(function(d) {
 			if(d.call.duration > 0)
 			{
 				var node;
@@ -86,16 +126,26 @@ BubbleChart = (function() {
 					currElem++;
 					return chart.nodes.push(node);
 				}			
-			}
-		});
-		
-		chart.nodes.forEach(function(d) {
-				d.radius = chart.radius_scale(d.value)
-			});
+			}	
 			
-		return this.nodes.sort(function(a, b) {
+			});	
+		var max_amount = d3.max(chart.nodes, function(d) {
+			return d.value;
+		});
+		chart.radius_scale = d3.scale.pow().exponent(0.5).domain([0, max_amount]).range([2, 85]);
+			
+		chart.nodes.forEach(function(d) {
+			d.radius = chart.radius_scale(d.value)
+		});
+				
+		chart.nodes.sort(function(a, b) {
 			return b.value - a.value;
 		});
+		
+		chart.create_vis();
+		chart.start();
+		return chart.display_group_all();
+		
 	};
 	
 	BubbleChart.prototype.create_vis = function() {
@@ -456,10 +506,10 @@ $(function() {
 	
 	var callData, smsData;
 	
-	render_vis = function(btData) {
-		chart = new BubbleChart(callData, smsData, btData);
-		chart.start();
-		return root.display_all();
+	render_vis = function() {
+		chart = new BubbleChart();
+	//	chart.start();
+	//	return root.display_all();
 	};
 	
 	root.display_all = function() {
@@ -481,9 +531,7 @@ $(function() {
 			}
 		}
 	};
-	d3.json("http://localhost:8000/Sensible/data/call_log/cf6b8394-cd5c-4431-a5f0-cfeee033262e",  function(data) { callData = data} );
-	d3.json("http://localhost:8000/Sensible/data/sms/cf6b8394-cd5c-4431-a5f0-cfeee033262e",  function(data) { smsData = data} );
-	return d3.json("http://localhost:8000/Sensible/data/bluetooth/cf6b8394-cd5c-4431-a5f0-cfeee033262e",  render_vis );
+	render_vis();
 });
 
 $(document).ready(function() {
