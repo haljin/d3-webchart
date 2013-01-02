@@ -1,7 +1,7 @@
 var BubbleChart, root,blocked=false;
 
 BubbleChart = (function() {
-	function BubbleChart() {	
+	function BubbleChart(token) {	
 	
 		//Layout fields
 		this.width = 940;
@@ -29,10 +29,12 @@ BubbleChart = (function() {
 		this.zoomed_radius=100;
 		this.vis = null;
 		this.force = null;
-		this.fill_color = d3.scale.ordinal().domain(["low", "medium", "high"]).range(["#d84b2a", "#beccae", "#7aa25c"]);
+		this.colors = ["#d84b2a", "#beccae", "#7aa25c"];
+		this.fill_color = d3.scale.ordinal().domain(["call", "sms", "bt"]).range(this.colors);
 		this.radius_scale;
 		
 		//Data fields
+		this.token = token;
 		this.callData;
 		this.smsData;
 		this.btData;
@@ -54,32 +56,32 @@ BubbleChart = (function() {
 	BubbleChart.prototype.load_data = function(start, end){
 		var chart = this;
 		var remaining = 3;
-		var runOnce1 = false, runOnce2 = false, runOnce3 = false;
+		var runOnce = [false, false, false];
 		
-		d3.json("http://localhost:8000/Sensible/data/call_log/cf6b8394-cd5c-4431-a5f0-cfeee033262e",  function(data) { 
-			if(!runOnce1)
+		d3.json("http://localhost:8000/Sensible/data/call_log/" + chart.token,  function(data) { 
+			if(!runOnce[0])
 			{
-				runOnce1 = true;
+				runOnce[0] = true;
 				chart.callData = data;
 				if (!--remaining )
 					chart.create_nodes();
 			}
 		});		
 			
-		d3.json("http://localhost:8000/Sensible/data/sms/cf6b8394-cd5c-4431-a5f0-cfeee033262e",  function(data) { 
-			if(!runOnce2)
+		d3.json("http://localhost:8000/Sensible/data/sms/" + chart.token,  function(data) { 
+			if(!runOnce[1])
 			{
-				runOnce2 = true;
+				runOnce[1] = true;
 				chart.smsData = data;
 				if (!--remaining )
 					chart.create_nodes();
 			}
 		});			
 				
-		d3.json("http://localhost:8000/Sensible/data/bluetooth/cf6b8394-cd5c-4431-a5f0-cfeee033262e",  function(data) { 
-			if(!runOnce3)
+		d3.json("http://localhost:8000/Sensible/data/bluetooth/" + chart.token,  function(data) { 
+			if(!runOnce[2])
 			{
-				runOnce3 = true;
+				runOnce[2] = true;
 				chart.btData = data;
 				if (!--remaining )
 					chart.create_nodes();
@@ -95,49 +97,117 @@ BubbleChart = (function() {
 		var extractNumber = function(hash) {
 			return hash.substring(16, hash.length-2)
 		}
+		var createNode = function (id, name, cScore, smsScore, bScore)
+		{
+			return {
+				id: id,
+				radius: 0,//_this.radius_scale(parseInt(d.total_amount)),
+				value: 0,
+				callScore: cScore,
+				smsScore: smsScore,
+				btScore: bScore,
+				name: name,
+				x: Math.random() * 900,
+				y: Math.random() * 800
+			}
+		}
 		
+		//Parse Call data
 		chart.callData.forEach(function(d) {
-			if(d.call.duration > 0)
+			if(d.call.duration > 0 && d.call.name != "")
 			{
 				var node;
 				var exists = false;
 				chart.nodes.forEach(function(x) {
-					if( x.number == extractNumber(d.call.number))
+					if( x.name == extractNumber(d.call.name))
 					{
-						x.value += d.call.duration;
 						exists = true;
 					}
 				
 				});
 				if (!exists)
 				{
-					node = {
-						id: currElem,
-						radius: 0,//_this.radius_scale(parseInt(d.total_amount)),
-						value: d.call.duration,
-						callScore: d.call.duration,
-						smsScore: 0,
-						btScore: 0,
-						number: extractNumber(d.call.number),
-						name: extractNumber(d.call.number),
-						x: Math.random() * 900,
-						y: Math.random() * 800
-					};
+					node = createNode(currElem, extractNumber(d.call.number), d.call.duration, 0, 0);
 					currElem++;
 					return chart.nodes.push(node);
 				}			
 			}	
 			
-			});	
-		var max_amount = d3.max(chart.nodes, function(d) {
-			return d.value;
-		});
-		chart.radius_scale = d3.scale.pow().exponent(0.5).domain([0, max_amount]).range([2, 85]);
+		});	
+		
+		//Parse SMS data
+		chart.smsData.forEach(function(d) {
+			if ( d.message.person != "")
+			{
+				var node;
+				var exists = false;
+				chart.nodes.forEach(function(x) {
+					if( x.name == extractNumber(d.message.person))
+					{
+						x.smsScore += 1;
+						exists = true;
+					}
+				
+				});
+				if (!exists)
+				{
+					node = createNode(currElem, extractNumber(d.message.person), 0, 1, 0);
+					currElem++;
+					return chart.nodes.push(node);
+				}			
+			}			
+		});	
+		
+		//Parse Bluetooth data
+		chart.btData.forEach(function(d) {
+			d.devices.forEach(function(x){
+				if ( x.sensible_user_id != "" && x.sensible_user_id != null)
+				{
+					var node;
+					var exists = false;
+					chart.nodes.forEach(function(e) {
+						if( e.name == x.sensible_user_id)
+						{
+							e.btScore += 1;
+							exists = true;
+						}
+					
+					});
+					if (!exists)
+					{
+						node = createNode(currElem, x.sensible_user_id, 0, 0, 1);
+						currElem++;
+						return chart.nodes.push(node);
+					}			
+				}	
+			})			
+		});		
+		
+		
+		var max_amount = 0;
+		
+		chart.nodes.forEach(function(d) {
+			var scores = [d.callScore, d.smsScore, d.btScore];
+			var toLabel = ["call", "sms", "bt"]
+			var maxIndex = 0, maxValue = 0;		
+			for(var i = 0; i<3; ++i)
+				if(scores[i] > maxValue)
+				{
+					maxIndex = i;
+					maxValue = scores[i];
+				}
 			
+			
+			d.value = d.callScore/2 + 5 * d.smsScore + d.btScore;
+			d.group = toLabel[maxIndex];
+			max_amount = d.value > max_amount? d.value : max_amount;
+				
+		});
+
+		chart.radius_scale = d3.scale.pow().exponent(0.5).domain([0, max_amount]).range([2, 85]);			
 		chart.nodes.forEach(function(d) {
 			d.radius = chart.radius_scale(d.value)
-		});
-				
+		});				
 		chart.nodes.sort(function(a, b) {
 			return b.value - a.value;
 		});
@@ -215,7 +285,7 @@ BubbleChart = (function() {
 		.duration(2000)
 		.attr("r", chart.zoomed_radius)
 		.each('end',function(){
-				chart.draw_pie_chart(chart);
+				chart.draw_pie_chart(chart,d);
 		});
 	};
 	
@@ -249,117 +319,110 @@ BubbleChart = (function() {
 		
 	};
 	
-	BubbleChart.prototype.draw_pie_chart = function(chart) {
+	BubbleChart.prototype.draw_pie_chart = function(chart,d) {
 		
 		var radius = chart.zoomed_radius;
-
 		var color = d3.scale.ordinal()
-		.range(["#98abc5", "#8a89a6", "#7b6888", "#6b486b", "#a05d56", "#d0743c", "#ff8c00"]);
-		
+		.range(this.colors);
+		//var data = [d.callData, d.smsData, d.btData];
+		var data = [{value:30, label: "Calls"}, {value:30, label: "SMS"}, {value:30, label: "Bluetooth"}];
 		var arc = d3.svg.arc()
 		.outerRadius(radius)
-		.innerRadius(0);
-		
+		.innerRadius(0);		
 		var pie = d3.layout.pie()
 		.sort(null)
-		.value(function(d) { return d.population; });
+		.value(function(d) { return d.value; });
+		var toLabel = ["call", "sms", "bt"]
 		
 		var svg = chart.vis
 		.append("g")
-		.attr("transform", "translate(" + this.center.x+ "," +this.center.y + ")")
+		.attr("transform", "translate(" + this.center.x + "," + this.center.y + ")")
 		.attr("id","pie");
 		
-		d3.csv("data/data.csv", function(data) {		
-			data.forEach(function(d) {
-				d.population = +d.population;
-			});
-			
-			var g = svg.selectAll(".arc")
-			.data(pie(data))
-			.enter().append("g")
-			.attr("class", "arc");
-			
-			g.append("path")
-			.attr("d", arc)
-			.style("fill", function(d) { return color(d.data.age); })
-			.transition().duration(1000).attrTween("d", function(data)
-			{
-      			var interpolation = d3.interpolate({startAngle: 0, endAngle: 0}, data);
-      			this._current = interpolation(0);
-      			return function(t) {
-          			return arc(interpolation(t));
-      			};
-			})
-			.each("end", function(){
-          		this._listenToEvents = true;
-        	});
-      
-    	 	var paths = g.selectAll("path");
-			 
-      		
-      		paths
-            .on("mouseover", function(d){ 
-                 // Mouseover effect if no transition has started                
-                if(this._listenToEvents){
-                  // Calculate angle bisector
-                  var ang = d.startAngle + (d.endAngle - d.startAngle)/2; 
-                  // Transformate to SVG space
-                  ang = (ang - (Math.PI / 2) ) * -1;
-
-                  // Calculate a 10% radius displacement
-                  var x = Math.cos(ang) * radius * 0.1;
-                  var y = Math.sin(ang) * radius * -0.1;
-
-                  d3.select(this).transition()
-                    .duration(250).attr("transform", "translate("+x+","+y+")"); 
-				
-				  chart.vis.selectAll("#" + d.data.age)
-					.attr("stroke-width", 2)
-					.attr("r",6)
-					.style("font-weight","bold");
-					
-                }
-              })
-            .on("mouseout", function(d){
-              // Mouseout effect if no transition has started                
-              if(this._listenToEvents){
-                d3.select(this).transition()
-                  .duration(150).attr("transform", "translate(0,0)"); 
-				
-				chart.vis.selectAll("#" + d.data.age)
-					.attr("stroke-width", 1)
-					.attr("r",5)
-					.style("font-weight","normal");
-              }
-            });
-			
-			g.append("text")
-			.attr("x", 300)
-			.attr("y",function(d,i){
-				return 150+i*15;
-				})
-			.attr("id",function(d){
-				return d.data.age;
-				})
-			.text(function(d) { 
-				return d.data.age; 
-			});
-			
-			g.append("circle")
-			.attr("cx",290)
-			.attr("cy",function(d,i){
-				return 145+i*15;
-				})
-			.attr("r",5)
-			.attr("id",function(d){
-				return d.data.age;
-				})
-			.attr("stroke", "#000")
-        	.attr("stroke-width", 1)
-			.attr("fill", function(d) { return color(d.data.age); })
-			;
 		
+		var g = svg.selectAll(".arc")
+		.data(pie(data))
+		.enter().append("g")
+		.attr("class", "arc");
+		
+		g.append("path")
+		.attr("d", arc)
+		.style("fill", function(d,i) { return color(toLabel[i]); })
+		.transition().duration(1000).attrTween("d", function(data)
+		{
+			var interpolation = d3.interpolate({startAngle: 0, endAngle: 0}, data);
+			this._current = interpolation(0);
+			return function(t) {
+				return arc(interpolation(t));
+			};
+		})
+		.each("end", function(){
+			this._listenToEvents = true;
 		});
+  
+		var paths = g.selectAll("path");
+		 
+		
+		paths
+		.on("mouseover", function(d){ 
+			 // Mouseover effect if no transition has started                
+			if(this._listenToEvents){
+			  // Calculate angle bisector
+			  var ang = d.startAngle + (d.endAngle - d.startAngle)/2; 
+			  // Transformate to SVG space
+			  ang = (ang - (Math.PI / 2) ) * -1;
+
+			  // Calculate a 10% radius displacement
+			  var x = Math.cos(ang) * radius * 0.1;
+			  var y = Math.sin(ang) * radius * -0.1;
+
+			  d3.select(this).transition()
+				.duration(250).attr("transform", "translate("+x+","+y+")"); 
+			
+			  chart.vis.selectAll("#" + d.data.label)
+				.attr("stroke-width", 2)
+				.attr("r",6)
+				.style("font-weight","bold");
+				
+			}
+		  })
+		.on("mouseout", function(d){
+		  // Mouseout effect if no transition has started                
+		  if(this._listenToEvents){
+			d3.select(this).transition()
+			  .duration(150).attr("transform", "translate(0,0)"); 
+			
+			chart.vis.selectAll("#" + d.data.label)
+				.attr("stroke-width", 1)
+				.attr("r",5)
+				.style("font-weight","normal");
+		  }
+		});
+		
+		g.append("text")
+		.attr("x", 300)
+		.attr("y",function(d,i){
+			return 150+i*15;
+			})
+		.attr("id",function(d){
+			return d.data.label;
+			})
+		.text(function(d) { 
+			return d.data.label; 
+		});
+		
+		g.append("circle")
+		.attr("cx",290)
+		.attr("cy",function(d,i){
+			return 145+i*15;
+			})
+		.attr("r",5)
+		.attr("id",function(d){
+			return d.data.label;
+			})
+		.attr("stroke", "#000")
+		.attr("stroke-width", 1)
+		.attr("fill", function(d, i) { return color(toLabel[i]); });		
 	};
 	BubbleChart.prototype.undraw_pie_chart = function(chart) {
 		
@@ -385,7 +448,7 @@ BubbleChart = (function() {
 		})
 		.remove();
 		
-		};
+	};
 		
 		
 		
@@ -474,9 +537,10 @@ BubbleChart = (function() {
 		{
 			var content;
 			d3.select(element).attr("stroke", "black");
-			content = "<span class=\"name\">Title:</span><span class=\"value\"> " + data.name + "</span><br/>";
-			content += "<span class=\"name\">Amount:</span><span class=\"value\"> $" + (addCommas(data.value)) + "</span><br/>";
-			content += "<span class=\"name\">Year:</span><span class=\"value\"> " + data.year + "</span>";
+			content = "<span class=\"name\">ID:</span><span class=\"value\"> " + data.name + "</span><br/>";
+			content += "<span class=\"name\">Calls:</span><span class=\"value\">" + (addCommas(data.callScore)) + "</span><br/>";
+			content += "<span class=\"name\">Sms:</span><span class=\"value\">" + (addCommas(data.smsScore)) + "</span><br/>";
+			content += "<span class=\"name\">Bt:</span><span class=\"value\">" + (addCommas(data.btScore)) + "</span><br/>";
 			return this.tooltip.showTooltip(content, d3.event);
 		}
 	};	
@@ -496,26 +560,17 @@ BubbleChart = (function() {
 })();
 
 
-
-	
-	
 root = typeof exports !== "undefined" && exports !== null ? exports : this;
 
 $(function() {
-	var chart=null, render_vis,_this = this;
-	
-	var callData, smsData;
-	
+	var chart=null, render_vis;
+	var token = "cf6b8394-cd5c-4431-a5f0-cfeee033262e";
 	render_vis = function() {
-		chart = new BubbleChart();
-	//	chart.start();
-	//	return root.display_all();
+		chart = new BubbleChart(token);
 	};
 	
 	root.display_all = function() {
-
 			return chart.display_group_all();
-
 	};
 	root.display_year = function() {
 		return chart.display_by_year();
