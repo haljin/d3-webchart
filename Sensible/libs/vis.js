@@ -49,7 +49,7 @@ BubbleChart = (function() {
 		this.startTime;
 		this.endTime;
 		this.mode = 0;
-			
+		this.inTransition = false;
 		
 		this.load_data(this.startTime, this.endTime);
 	}
@@ -246,15 +246,16 @@ BubbleChart = (function() {
 		}).on("mouseout", function(d, i) {
 			return chart.hide_details(d, i, this);
 		}).on("click",function(d, i) {
-			if(chart.zoomed==false){
-				chart.zoomed = true;
-				chart.hide_details(d, i, this);
-				return chart.zoom_circle(d);
-			}
-			else {
-				chart.zoomed = false;
-				return chart.unzoom_circle();
-			}
+			if(!chart.inTransition)
+				if(chart.zoomed==false){
+					chart.inTransition = true;
+					chart.hide_details(d, i, this);
+					return chart.zoom_circle(d);
+				}
+				else {
+					chart.inTransition = true;
+					return chart.unzoom_circle();
+				}
 		});		
 		
 		//Draw the button that allows splitting		
@@ -291,8 +292,9 @@ BubbleChart = (function() {
 	
 	};
 	
-	BubbleChart.prototype.zoom_circle = function(d) {
+	BubbleChart.prototype.zoom_circle = function(d) {		
 		var chart = this;
+		chart.zoomed = true;
 		var other_circles = this.circles;	
 		var new_circle = this.circles
 						.data([{id: "zoomed"}], function(d) {
@@ -300,6 +302,8 @@ BubbleChart = (function() {
 						})
 						.enter();		
 		this.clicked = d; 
+		
+		
 		//Darken other circles
 		other_circles.transition().duration(2000).attr("fill", function(d) {
 			return d3.rgb(chart.fill_color(d.group)).darker().darker().darker();
@@ -321,7 +325,9 @@ BubbleChart = (function() {
 		.duration(2000)
 		.attr("r", chart.zoomed_radius)
 		.each('end',function(){
+			if(chart.zoomed)
 				chart.draw_pie_chart(chart,d);
+			
 		});
 	};
 	
@@ -348,7 +354,9 @@ BubbleChart = (function() {
 				chart.vis.selectAll("#unzoom").remove();
 			})
 			.each('end',function(){
-				new_circle.remove();				
+				new_circle.remove();
+				chart.zoomed = false;
+				chart.inTransition = false;
 			});
 		});
 		
@@ -392,6 +400,7 @@ BubbleChart = (function() {
 		})
 		.each("end", function(){
 			this._listenToEvents = true;
+			chart.inTransition = false;	
 		});
   
 		var paths = g.selectAll("path");
@@ -473,7 +482,6 @@ BubbleChart = (function() {
 		.attr("stroke", "#aaaaaa")
 		.attr("stroke-width", 2)
 		.on("click", function() {
-			chart.zoomed = false;
 			chart.unzoom_circle();
 		})
 		.on("mouseover", function() {
