@@ -204,7 +204,7 @@ BubbleChart = (function() {
 		var radius = chart.zoomed_radius;
 
 		var color = d3.scale.ordinal()
-		.range(["#98abc5", "#8a89a6", "#7b6888", "#6b486b", "#a05d56", "#d0743c", "#ff8c00"]);
+		.range(["#8106a9", "#d60062", "#4312ae"]);
 		
 		var arc = d3.svg.arc()
 		.outerRadius(radius)
@@ -481,9 +481,9 @@ $(function() {
 			}
 		}
 	};
-	d3.json("http://localhost:8000/Sensible/data/call_log/cf6b8394-cd5c-4431-a5f0-cfeee033262e",  function(data) { callData = data} );
-	d3.json("http://localhost:8000/Sensible/data/sms/cf6b8394-cd5c-4431-a5f0-cfeee033262e",  function(data) { smsData = data} );
-	return d3.json("http://localhost:8000/Sensible/data/bluetooth/cf6b8394-cd5c-4431-a5f0-cfeee033262e",  render_vis );
+	d3.json("http://localhost:8000/data/call_log/cf6b8394-cd5c-4431-a5f0-cfeee033262e",  function(data) { callData = data} );
+	d3.json("http://localhost:8000/data/sms/cf6b8394-cd5c-4431-a5f0-cfeee033262e",  function(data) { smsData = data} );
+	return d3.json("http://localhost:8000/data/bluetooth/cf6b8394-cd5c-4431-a5f0-cfeee033262e",  render_vis );
 });
 
 $(document).ready(function() {
