@@ -1,11 +1,13 @@
 var BubbleChart, root;
 
 BubbleChart = (function() {
-	function BubbleChart(data) {	
+	function BubbleChart(callData, smsData, btData) {	
 		var max_amount;	
 		this.zoomed = false;
 		this.clicked = null;
-		this.data = data;
+		this.callData = callData;
+		this.smsData = smsData;
+		this.btData = btData;
 		this.width = 940;
 		this.height = 600;
 		this.tooltip = CustomTooltip("gates_tooltip", 240);
@@ -35,8 +37,8 @@ BubbleChart = (function() {
 		this.circles = null;
 		this.fill_color = d3.scale.ordinal().domain(["low", "medium", "high"]).range(["#d84b2a", "#beccae", "#7aa25c"]);
 		
-		max_amount = d3.max(this.data, function(d) {
-			return parseInt(d.total_amount);
+		max_amount = d3.max(this.callData, function(d) {
+			return d.call.duration;
 		});
 		
 		this.radius_scale = d3.scale.pow().exponent(0.5).domain([0, max_amount]).range([2, 85]);
@@ -47,22 +49,48 @@ BubbleChart = (function() {
 	}
 	
 	BubbleChart.prototype.create_nodes = function() {
-		var _this = this;
-		this.data.forEach(function(d) {
-			var node;
-			node = {
-				id: d.id,
-				radius: _this.radius_scale(parseInt(d.total_amount)),
-				value: d.total_amount,
-				name: d.grant_title,
-				org: d.organization,
-				group: d.group,
-				year: d.start_year,
-				x: Math.random() * 900,
-				y: Math.random() * 800
-			};
-			return _this.nodes.push(node);
+		var chart = this;
+		var currElem = 0;
+		var extractNumber = function(hash) {
+			return hash.substring(16, hash.length-2)
+		}
+		this.callData.forEach(function(d) {
+			if(d.call.duration > 0)
+			{
+				var node;
+				var exists = false;
+				chart.nodes.forEach(function(x) {
+					if( x.number == extractNumber(d.call.number))
+					{
+						x.value += d.call.duration;
+						exists = true;
+					}
+				
+				});
+				if (!exists)
+				{
+					node = {
+						id: currElem,
+						radius: 0,//_this.radius_scale(parseInt(d.total_amount)),
+						value: d.call.duration,
+						callScore: d.call.duration,
+						smsScore: 0,
+						btScore: 0,
+						number: extractNumber(d.call.number),
+						name: extractNumber(d.call.number),
+						x: Math.random() * 900,
+						y: Math.random() * 800
+					};
+					currElem++;
+					return chart.nodes.push(node);
+				}			
+			}
 		});
+		
+		chart.nodes.forEach(function(d) {
+				d.radius = chart.radius_scale(d.value)
+			});
+			
 		return this.nodes.sort(function(a, b) {
 			return b.value - a.value;
 		});
@@ -309,11 +337,12 @@ BubbleChart = (function() {
 root = typeof exports !== "undefined" && exports !== null ? exports : this;
 
 $(function() {
-	var chart, render_vis,
-	_this = this;
-	chart = null;
-	render_vis = function(csv) {
-		chart = new BubbleChart(csv);
+	var chart=null, render_vis,_this = this;
+	
+	var callData, smsData;
+	
+	render_vis = function(btData) {
+		chart = new BubbleChart(callData, smsData, btData);
 		chart.start();
 		return root.display_all();
 	};
@@ -331,5 +360,7 @@ $(function() {
 			return root.display_all();
 		}
 	};
-	return d3.csv("data/gates_money.csv", render_vis);
+	d3.json("http://localhost:8000/Sensible/data/call_log/cf6b8394-cd5c-4431-a5f0-cfeee033262e",  function(data) { callData = data} );
+	d3.json("http://localhost:8000/Sensible/data/sms/cf6b8394-cd5c-4431-a5f0-cfeee033262e",  function(data) { smsData = data} );
+	return d3.json("http://localhost:8000/Sensible/data/bluetooth/cf6b8394-cd5c-4431-a5f0-cfeee033262e",  render_vis );
 });
