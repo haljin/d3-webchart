@@ -35,19 +35,21 @@ BubbleChart = (function() {
 		
 		//Data fields
 		this.token = token;
-		this.baseUrl = "http://localhost:8000/data"
+		this.baseUrl = "http://localhost:8000/Sensible/data"
 		this.callData;
 		this.smsData;
 		this.btData;
 		this.nodes = [];
+		this.totalCyborgScore = 0;
+		this.totalCavemanScore = 0;
 		
 		//Control fields		
 		this.zoomed = false;
 		this.clicked = null;		
 		this.tooltip = CustomTooltip("gates_tooltip", 240);		
 		this.circles = null;	
-		this.startTime;
-		this.endTime;
+		this.startTime = 0;
+		this.endTime = 1357239686922;
 		this.mode = 0;
 		this.inTransition = false;
 		
@@ -89,7 +91,7 @@ BubbleChart = (function() {
 					chart.create_nodes();
 			}
 
-		chart.show_loading_screen();
+		
 		});	
 
 	};
@@ -119,7 +121,7 @@ BubbleChart = (function() {
 		
 		//Parse Call data
 		chart.callData.forEach(function(d) {
-			if(d.call.duration > 0 && d.call.name != "")
+			if(d.call.duration > 5 && d.call.name != "" && d.timestamp > chart.startTime && d.timestamp < chart.endTime)
 			{
 				var node;
 				var exists = false;
@@ -142,21 +144,21 @@ BubbleChart = (function() {
 		
 		//Parse SMS data
 		chart.smsData.forEach(function(d) {
-			if ( d.message.person != "")
+			if ( d.message.person != "" && d.timestamp > chart.startTime && d.timestamp < chart.endTime)
 			{
 				var node;
 				var exists = false;
 				chart.nodes.forEach(function(x) {
 					if( x.name == extractNumber(d.message.person))
 					{
-						x.smsScore += 1;
+						x.smsScore += 30;
 						exists = true;
 					}
 				
 				});
 				if (!exists)
 				{
-					node = createNode(currElem, extractNumber(d.message.person), 0, 1, 0);
+					node = createNode(currElem, extractNumber(d.message.person), 0, 30, 0);
 					currElem++;
 					return chart.nodes.push(node);
 				}			
@@ -166,24 +168,27 @@ BubbleChart = (function() {
 		//Parse Bluetooth data
 		chart.btData.forEach(function(d) {
 			d.devices.forEach(function(x){
-				if ( x.sensible_user_id != "" && x.sensible_user_id != null)
+				var lastContact = 0;
+				if ( x.sensible_user_id != "" && x.sensible_user_id != null && d.timestamp > chart.startTime && d.timestamp < chart.endTime)
 				{
 					var node;
-					var exists = false;
+					var exists = false;					
 					chart.nodes.forEach(function(e) {
 						if( e.name == x.sensible_user_id)
 						{
-							e.btScore += 1;
+							e.btScore += (e.lastContact - Date.now() > 300000)? 300: 30;
+							e.lastContact = d.timestamp;
 							exists = true;
 						}
 					
 					});
 					if (!exists)
 					{
-						node = createNode(currElem, x.sensible_user_id, 0, 0, 1);
+						node = createNode(currElem, x.sensible_user_id, 0, 0, 30);
+						node.lastContact = d.timestamp;
 						currElem++;
 						return chart.nodes.push(node);
-					}			
+					}
 				}	
 			})			
 		});		
@@ -203,7 +208,7 @@ BubbleChart = (function() {
 				}
 			
 			
-			d.value = d.callScore/2 + 5 * d.smsScore + d.btScore;
+			d.value = d.callScore +  d.smsScore + d.btScore;
 			d.group = toLabel[maxIndex];
 			
 			if (d.callScore + d.smsScore > 1.5 * d.btScore)
@@ -212,12 +217,13 @@ BubbleChart = (function() {
 				d.type = "caveman";
 			else
 				d.type = "balanced";
-			
+			chart.totalCyborgScore += d.callScore + d.smsScore;
+			chart.totalCavemanScore += d.btScore;
 			max_amount = d.value > max_amount? d.value : max_amount;
 				
 		});
-
-		chart.radius_scale = d3.scale.pow().exponent(0.5).domain([0, max_amount]).range([2, 85]);			
+		var max_radius = d3.scale.pow().exponent(0.5).domain([0, 120000]).range([100,60]);
+		chart.radius_scale = d3.scale.pow().exponent(0.5).domain([0, max_amount]).range([2, max_radius(chart.totalCyborgScore + chart.totalCavemanScore)]);			
 		chart.nodes.forEach(function(d) {
 			d.radius = chart.radius_scale(d.value)
 		});				
@@ -372,7 +378,7 @@ BubbleChart = (function() {
 		var radius = chart.zoomed_radius;
 		var color = d3.scale.ordinal()
 		.range(this.colors);		
-		var data = [{value:30, label: "Calls"}, {value:30, label: "SMS"}, {value:30, label: "Bluetooth"}];
+		var data = [{value:30, label: "Calls"}, {value:30, label: "SMS"}, {value:60, label: "Bluetooth"}];
 
 		var arc = d3.svg.arc()
 		.outerRadius(radius)
@@ -518,7 +524,34 @@ BubbleChart = (function() {
 		.remove();		
 	};		
 		
+	BubbleChart.prototype.draw_scale = function() {
+		var chart = this;
+		var value = chart.totalCavemanScore / chart.totalCyborgScore;
+		value = 0.7;
+		var scale = value >= 1? 
+							d3.scale.pow().exponent(0.5).domain([1, 2]).range([chart.center.x-2,chart.center.x+198]).clamp(true):
+							d3.scale.pow().exponent(0.5).domain([1, 0]).range([chart.center.x-2, chart.center.x-202]).clamp(true);
+		
+		var group = chart.vis.append("g")
 
+		group.append("rect")
+		.attr("x", chart.center.x-200)
+		.attr("y", chart.height - 47)
+		.attr("width", 400)
+		.attr("height", 10)
+		.attr("fill", "#aaaaaa");
+		
+		group.append("rect")
+		.attr("x", chart.center.x-2)
+		.attr("y", chart.height - 50)
+		.attr("width", 4)
+		.attr("height", 10)
+		.attr("fill", "#000000")
+		.transition()
+		.attr("x", scale(value))
+		.duration(1000);
+	};
+	
 	BubbleChart.prototype.charge = function(d) {
 		return -Math.pow(d.radius, 2.0) / 8;
 	};
@@ -560,6 +593,7 @@ BubbleChart = (function() {
 			});
 		});
 		this.force.start();
+		this.draw_scale();
 		return this.display_years();
 	};
 	
@@ -700,8 +734,9 @@ root = typeof exports !== "undefined" && exports !== null ? exports : this;
 
 $(function() {
 	var chart=null;
-	var token = "cf6b8394-cd5c-4431-a5f0-cfeee033262e";
+	var token = "32d74aa9-211e-4bbd-b99d-9af5aebb370d";
 
 	chart = new BubbleChart(token);
+	return chart.show_loading_screen();
 });
 
