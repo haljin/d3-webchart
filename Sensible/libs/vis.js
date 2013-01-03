@@ -44,7 +44,7 @@ BubbleChart = (function() {
 		//Control fields		
 		this.zoomed = false;
 		this.clicked = null;		
-		this.tooltip = CustomTooltip("gates_tooltip", 240);		
+		this.tooltip = CustomTooltip("gates_tooltip", 300);		
 		this.circles = null;	
 		this.startTime;
 		this.endTime;
@@ -264,17 +264,8 @@ BubbleChart = (function() {
 		});		
 		
 		//Draw the button that allows splitting		
-		var button = this.vis.append("rect")
-		.attr("id", "split")
-		.attr("x", this.center.x - 50)
-		.attr("y", this.height - 35)
-		.attr("rx", 10)
-		.attr("ry", 10)
-		.attr("width", 100)
-		.attr("height", 30)
-		.attr("fill", "#dddddd")
-		.attr("stroke", "#aaaaaa")
-		.attr("stroke-width", 2)
+		var button_text,button;
+		var group= this.vis.append("g")
 		.on("click", function() {
 			if(!chart.zoomed)
 				if(chart.mode == 0)
@@ -284,12 +275,30 @@ BubbleChart = (function() {
 		})
 		.on("mouseover", function() {
 			if(!chart.zoomed)
-				button.attr("fill", "#ffffff");
+				button.attr("fill", "#B1B1B1");
 		})
 		.on("mouseout", function() {
 			button.attr("fill", "#dddddd");
 		});
+		button = group.append("rect")
+		.attr("id", "split")
+		.attr("x", this.center.x - 50)
+		.attr("y", 10)
+		.attr("width", 90)
+		.attr("height", 30)
+		.attr("fill", "#dddddd")
+		.attr("stroke", "#aaaaaa")
+		.attr("stroke-width", 0.25);
 		
+		button_text=group.append("text")
+		.attr("id","button_text")
+		.attr("x", this.center.x - 40)
+		.attr("y", 30)
+		.style("cursor","hand")
+		.style("font-family","Segoe UI")
+		.style("font-size","15px")
+		.style("font-variant","small-caps")
+		.text("Show scale");
 
 		return this.circles.transition().duration(2000).attr("r", function(d) {
 			return d.radius;
@@ -376,7 +385,7 @@ BubbleChart = (function() {
 
 		var arc = d3.svg.arc()
 		.outerRadius(radius)
-		.innerRadius(0);		
+		.innerRadius(100);		
 		var pie = d3.layout.pie()
 		.sort(null)
 		.value(function(d) { return d.value; });
@@ -395,6 +404,10 @@ BubbleChart = (function() {
 		g.append("path")
 		.attr("d", arc)
 		.style("fill", function(d,i) { return color(toLabel[i]); })
+		.attr("stroke", function(d,i) {
+				return d3.rgb(chart.fill_color(color(toLabel[i]))).darker();
+			})
+		.style("stroke-width","2px")
 		.transition().duration(1000).attrTween("d", function(data)
 		{
 			var interpolation = d3.interpolate({startAngle: 0, endAngle: 0}, data);
@@ -449,10 +462,10 @@ BubbleChart = (function() {
 		
 		//Draw the legend labels
 		g.append("text")
-		.attr("x", 300)
-		.attr("y",function(d,i){
-			return 150+i*15;
+		.attr("x", function(d,i){
+			return -80+i*70;
 		})
+		.attr("y",350)
 		.attr("id",function(d){
 			return d.data.label;
 		})
@@ -461,9 +474,9 @@ BubbleChart = (function() {
 		});
 		//Draw the legend circles
 		g.append("circle")
-		.attr("cx",290)
-		.attr("cy",function(d,i){
-			return 145+i*15;
+		.attr("cy",345)
+		.attr("cx",function(d,i){
+			return -90+i*70;
 		})
 		.attr("r",5)
 		.attr("id",function(d){
@@ -501,7 +514,7 @@ BubbleChart = (function() {
 		var radius = chart.zoomed_radius;
 		var arc = d3.svg.arc()
 		.outerRadius(radius)
-		.innerRadius(0);		
+		.innerRadius(100);		
 		var g = chart.vis.selectAll("path");	
 		
 		
@@ -537,6 +550,7 @@ BubbleChart = (function() {
 				return d.y;
 			});
 		});
+		chart.vis.select("#button_text").text("Show scale").attr("x", this.center.x - 40);
 		this.force.start();
 		return this.hide_years();
 	};
@@ -559,6 +573,7 @@ BubbleChart = (function() {
 				return d.y;
 			});
 		});
+		chart.vis.select("#button_text").text("Hide scale").attr("x", this.center.x - 35);
 		this.force.start();
 		return this.display_years();
 	};
@@ -584,7 +599,7 @@ BubbleChart = (function() {
 		years = this.vis.selectAll(".years").data(years_data);
 		return years.enter().append("text").attr("class", "years").attr("x", function(d) {
 			return years_x[d];
-		}).attr("y", 40).attr("text-anchor", "middle").text(function(d) {
+		}).attr("y", 90).attr("text-anchor", "middle").text(function(d) {
 			return d;
 		});
 	};
