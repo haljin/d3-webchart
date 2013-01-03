@@ -1,5 +1,5 @@
 a, a:visited, a:active {
-  color: #444;
+  color: #585858;
 }
 
 #vis {
@@ -56,4 +56,12 @@ footer {
   fill-opacity: .7;
   stroke: #666;
   stroke-width: 1.5px;
+}
+
+#button_text {
+   -moz-user-select: -moz-none;
+   -khtml-user-select: none;
+   -webkit-user-select: none;
+   user-select: none;
+   background: transparent;
 }
