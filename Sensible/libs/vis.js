@@ -35,7 +35,7 @@ BubbleChart = (function() {
 		
 		//Data fields
 		this.token = token;
-		this.baseUrl = "http://localhost:8000/Sensible/data"
+		this.baseUrl = "http://localhost:8000/data"
 		this.callData;
 		this.smsData;
 		this.btData;
@@ -372,6 +372,7 @@ BubbleChart = (function() {
 			.each('start', function(){
 				chart.vis.selectAll("#pie").remove();
 				chart.vis.selectAll("#unzoom").remove();
+				chart.vis.selectAll("#button_x").remove();
 			})
 			.each('end',function(){
 				new_circle.remove();
@@ -494,26 +495,39 @@ BubbleChart = (function() {
 			return color(toLabel[i]); 
 		});		
 		//Draw the unzoom button
-		var button = this.vis.append("rect")
-		.attr("id", "unzoom")
-		.attr("x", 290 + chart.center.x)
-		.attr("y", 205 + chart.center.y)
-		.attr("rx", 3)
-		.attr("ry", 3)
-		.attr("width", 10)
-		.attr("height", 10)
-		.attr("fill", "#dddddd")
-		.attr("stroke", "#aaaaaa")
-		.attr("stroke-width", 2)
+		
+		var button, button_text;
+		var group= this.vis.append("g")
 		.on("click", function() {
 			chart.unzoom_circle();
 		})
 		.on("mouseover", function() {
-			button.attr("fill", "#ffffff");
+			button.attr("fill", "#B1B1B1");
 		})
 		.on("mouseout", function() {
 			button.attr("fill", "#dddddd");
 		});
+		
+		 button = group.append("rect")
+		.attr("id", "unzoom")
+	.attr("x", this.center.x + 250)
+		.attr("y", 10)
+		.attr("width", 30)
+		.attr("height", 30)
+		.attr("fill", "#dddddd")
+		.attr("stroke", "#aaaaaa")
+		.attr("stroke-width", 0.25);
+		
+		button_text=group.append("text")
+		.attr("id","button_x")
+		.attr("x", this.center.x + 260)
+		.attr("y", 30)
+		.style("cursor","hand")
+		.style("font-family","Segoe UI")
+		.style("font-size","20px")
+		.style("font-variant","small-caps")
+		.style("font-weight","bold")
+		.text("x");
 	};
 	
 	BubbleChart.prototype.undraw_pie_chart = function(chart) {		
