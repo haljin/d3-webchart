@@ -35,7 +35,7 @@ BubbleChart = (function() {
 		
 		//Data fields
 		this.token = token;
-		this.baseUrl = "http://localhost:8000/data"
+		this.baseUrl = "http://localhost:5777/Sensible/data"
 		this.callData;
 		this.smsData;
 		this.btData;
