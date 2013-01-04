@@ -24,6 +24,7 @@ BubbleChart = (function () {
                 y: this.height / 2
             }
         };
+        
         this.layout_gravity = -0.01;
         this.damper = 0.1;
         this.zoomed_radius = 200;
@@ -634,6 +635,7 @@ BubbleChart = (function () {
             "Balanced": this.width / 2,
             "Caveman": this.width - 160
         };
+        
         years_data = d3.keys(years_x);
         years = this.vis.selectAll(".years").data(years_data);
         return years.enter().append("text").attr("class", "years").attr("x", function (d) {
@@ -662,11 +664,11 @@ BubbleChart = (function () {
             if (minutes < 10)
                 content += ":0" + minutes;
             else
-                content += minutes.toString();
+                content += ":" + minutes;
             if (rest < 10)
                 content += ":0" + rest + " time in call.</span><br/>";
             else
-                content += rest + " time in call.</span><br/>";
+                content += ":" + rest + " time in call.</span><br/>";
 
             content += "<span class=\"name\">Sms: </span><span class=\"value\">" + data.smsStat + " messages.</span><br/>";
             content += "<span class=\"name\">Bluetooth: </span><span class=\"value\">" + data.btStat + " connections.</span><br/>";
@@ -733,11 +735,6 @@ BubbleChart = (function () {
                 path.transition()
 			.attrTween("d", arcTween);
             }
-
-
-
-
-
         }, 150);
 
         function arcTween(b) {
