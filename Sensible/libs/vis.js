@@ -24,7 +24,7 @@ BubbleChart = (function () {
                 y: this.height / 2
             }
         };
-        
+
         this.layout_gravity = -0.01;
         this.damper = 0.1;
         this.zoomed_radius = 200;
@@ -50,18 +50,23 @@ BubbleChart = (function () {
         this.clicked = null;
         this.tooltip = CustomTooltip("gates_tooltip", 300);
         this.circles = null;
-        this.startTime = 0;
-        this.endTime = 1357239686922;
+        this.startTime;
+        this.endTime;
         this.mode = 0;
         this.inTransition = false;
+        var date = new Date(Date.now()); 
+        date.setMonth(date.getMonth() - 1)
 
-        this.load_data(this.startTime, this.endTime);
-    }
+        this.load_data(0, Date.now());
+    };
 
     BubbleChart.prototype.load_data = function (start, end) {
         var chart = this;
         var remaining = 3;
         var runOnce = [false, false, false];
+        this.startTime = start;
+        this.endTime = end;
+
         //Load Call probe data
         d3.json(chart.baseUrl + "/call_log/" + chart.token, function (data) {
             if (!runOnce[0]) {
@@ -206,7 +211,8 @@ BubbleChart = (function () {
                     maxValue = scores[i];
                 }
 
-
+            d.callScore *= 2;
+            d.smsScore *= 2;
             d.value = d.callScore + d.smsScore + d.btScore;
             d.group = toLabel[maxIndex];
 
@@ -241,6 +247,15 @@ BubbleChart = (function () {
         var chart = this;
 
         this.vis = d3.select("#vis").append("svg").attr("width", this.width).attr("height", this.height).attr("id", "svg_vis");
+
+        if (!this.nodes.length) {
+            this.vis.append("text")
+            .attr("x", chart.center.x - 50)
+            .attr("y", chart.center.y)
+            .attr("size", 20)
+            .text("No data for selected time period");
+
+        }
         this.circles = this.vis.selectAll("circle").data(this.nodes, function (d) {
             return d.id;
         });
@@ -368,10 +383,10 @@ BubbleChart = (function () {
 			.attr("cy", chart.clicked.y)
 			.attr("r", 0)
 			.duration(2000)
-			.each('start', function(){
-				chart.vis.selectAll("#pie").remove();
-				chart.vis.selectAll("#unzoom").remove();
-				chart.vis.selectAll("#button_x").remove();
+			.each('start', function () {
+			    chart.vis.selectAll("#pie").remove();
+			    chart.vis.selectAll("#unzoom").remove();
+			    chart.vis.selectAll("#button_x").remove();
 			})
 			.each('end', function () {
 			    new_circle.remove();
@@ -489,24 +504,24 @@ BubbleChart = (function () {
 		})
 		.attr("stroke", "#000")
 		.attr("stroke-width", 1)
-		.attr("fill", function(d, i) { 
-			return color(toLabel[i]); 
-		});		
-		//Draw the unzoom button
-		
-		var button, button_text;
-		var group= this.vis.append("g")
-		.on("click", function() {
-			chart.unzoom_circle();
+		.attr("fill", function (d, i) {
+		    return color(toLabel[i]);
+		});
+        //Draw the unzoom button
+
+        var button, button_text;
+        var group = this.vis.append("g")
+		.on("click", function () {
+		    chart.unzoom_circle();
 		})
-		.on("mouseover", function() {
-			button.attr("fill", "#B1B1B1");
+		.on("mouseover", function () {
+		    button.attr("fill", "#B1B1B1");
 		})
 		.on("mouseout", function () {
 		    button.attr("fill", "#dddddd");
 		});
-		
-		 button = group.append("rect")
+
+        button = group.append("rect")
 		.attr("id", "unzoom")
 	.attr("x", this.center.x + 250)
 		.attr("y", 10)
@@ -515,22 +530,22 @@ BubbleChart = (function () {
 		.attr("fill", "#dddddd")
 		.attr("stroke", "#aaaaaa")
 		.attr("stroke-width", 0.25);
-		
-		button_text=group.append("text")
-		.attr("id","button_x")
+
+        button_text = group.append("text")
+		.attr("id", "button_x")
 		.attr("x", this.center.x + 260)
 		.attr("y", 30)
-		.style("cursor","hand")
-		.style("font-family","Segoe UI")
-		.style("font-size","20px")
-		.style("font-variant","small-caps")
-		.style("font-weight","bold")
+		.style("cursor", "hand")
+		.style("font-family", "Segoe UI")
+		.style("font-size", "20px")
+		.style("font-variant", "small-caps")
+		.style("font-weight", "bold")
 		.text("x");
-	};
-	
-	BubbleChart.prototype.undraw_pie_chart = function(chart) {		
-		var radius = chart.zoomed_radius;
-		var arc = d3.svg.arc()
+    };
+
+    BubbleChart.prototype.undraw_pie_chart = function (chart) {
+        var radius = chart.zoomed_radius;
+        var arc = d3.svg.arc()
 		.outerRadius(radius)
 		.innerRadius(100);
         var g = chart.vis.selectAll("path");
@@ -649,7 +664,7 @@ BubbleChart = (function () {
             "Balanced": this.width / 2,
             "Caveman": this.width - 160
         };
-        
+
         years_data = d3.keys(years_x);
         years = this.vis.selectAll(".years").data(years_data);
         return years.enter().append("text").attr("class", "years").attr("x", function (d) {
@@ -772,11 +787,12 @@ BubbleChart = (function () {
 
 root = typeof exports !== "undefined" && exports !== null ? exports : this;
 
-$(function() {
-	var chart=null;
-	var token = "32d74aa9-211e-4bbd-b99d-9af5aebb370d";
-
-	chart = new BubbleChart(token);
-	return chart.show_loading_screen();
+$(function () {
+    var chart = null;
+    var token = "32d74aa9-211e-4bbd-b99d-9af5aebb370d";
+    var timeline = null;
+    
+    chart = new BubbleChart(token);
+    return chart.show_loading_screen();
 });
 
