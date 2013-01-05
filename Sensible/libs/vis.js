@@ -473,7 +473,7 @@ BubbleChart = (function () {
 		        .attr("x", function () {
 		            if (d.data.label == "Calls") 
 		                 return 415;
-		            else if (d.data.label == "SMS")
+		            else if (d.data.label == "Sms")
 		                return 445;
 		            else if (d.data.label == "Bluetooth")
 		                return 435;
@@ -505,7 +505,7 @@ BubbleChart = (function () {
 
 		                return content;
 		            }
-		            else if (d.data.label == "SMS")
+		            else if (d.data.label == "Sms")
 		                return chart.clicked.smsStat + " messages";
 		            else if (d.data.label == "Bluetooth")
 		                return chart.clicked.btStat + " connections";
