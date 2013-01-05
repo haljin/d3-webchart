@@ -402,11 +402,11 @@ BubbleChart = (function () {
         var radius = chart.zoomed_radius;
         var color = d3.scale.ordinal()
 		.range(this.colors);
-        var data = [{ value: 30, label: "Calls" }, { value: 30, label: "SMS" }, { value: 60, label: "Bluetooth"}];
+        var data = [{ value: 30, label: "Calls" }, { value: 30, label: "Sms" }, { value: 60, label: "Bluetooth"}];
 
         var arc = d3.svg.arc()
 		.outerRadius(radius)
-		.innerRadius(100);
+		.innerRadius(130);
         var pie = d3.layout.pie()
 		.sort(null)
 		.value(function (d) { return d.value; });
@@ -424,6 +424,7 @@ BubbleChart = (function () {
 
         g.append("path")
 		.attr("d", arc)
+        .attr("id", "piechart")
 		.style("fill", function (d, i) { return color(toLabel[i]); })
 		.attr("stroke", function (d, i) {
 		    return d3.rgb(chart.fill_color(color(toLabel[i]))).darker();
@@ -442,6 +443,21 @@ BubbleChart = (function () {
 		});
 
         var paths = g.selectAll("path");
+        var text_scale = d3.scale.pow().domain([33, 50]).range([13, 6]).clamp(true);
+        chart.vis.append("image")
+                .attr("id", "image")
+                .attr("xlink:href", "http://localhost:5777/Sensible/data/unknown-person.gif")
+                .attr("x", 425)
+                .attr("y", 280)
+                .attr("width", 100)
+                .attr("height", 180);
+
+        chart.vis.append("text")
+		        .attr("x", 355)
+                .attr("id", "name")
+		        .attr("y", 450)
+		        .text(function () { return chart.clicked.name; })
+         .style("font-size",text_scale(chart.clicked.name.length)) ;
 
 
         paths
@@ -458,12 +474,59 @@ BubbleChart = (function () {
 		        var y = Math.sin(ang) * radius * -0.1;
 
 		        d3.select(this).transition()
-			.duration(250).attr("transform", "translate(" + x + "," + y + ")");
+			    .duration(250).attr("transform", "translate(" + x + "," + y + ")");
 
 		        chart.vis.selectAll("#" + d.data.label)
-			.attr("stroke-width", 2)
-			.attr("r", 6)
-			.style("font-weight", "bold");
+			    .attr("stroke-width", 2)
+			    .attr("r", 6)
+			    .style("font-weight", "bold");
+
+
+
+
+
+		        chart.vis.append("text")
+		        .attr("x", function () {
+		            if (d.data.label == "Calls") 
+		                 return 415;
+		            else if (d.data.label == "Sms")
+		                return 445;
+		            else if (d.data.label == "Bluetooth")
+		                return 435;
+
+		        })
+                .attr("id", "numberOfConnections")
+		        .attr("y", 500)
+                .style("font-family", "Segoe UI")
+		        .style("font-size", "15px")
+		        .style("font-variant", "small-caps")
+		        .text(function () {
+		            if (d.data.label == "Calls") {
+		                var content = "";
+		                var rest;
+		                var hours = Math.floor(chart.clicked.callStat / 3600);
+		                rest = chart.clicked.callStat % 3600;
+		                var minutes = Math.floor(rest / 60);
+		                rest = rest % 60;
+		                content += hours;
+		                if (minutes < 10)
+		                    content += ":0" + minutes;
+		                else
+		                    content += ":" + minutes;
+		                if (rest < 10)
+		                    content += ":0" + rest + " time in call";
+		                else
+		                    content += ":" + rest + " time in call";
+
+
+		                return content;
+		            }
+		            else if (d.data.label == "Sms")
+		                return chart.clicked.smsStat + " messages";
+		            else if (d.data.label == "Bluetooth")
+		                return chart.clicked.btStat + " connections";
+
+		        });
 
 		    }
 		})
@@ -477,15 +540,19 @@ BubbleChart = (function () {
 				.attr("stroke-width", 1)
 				.attr("r", 5)
 				.style("font-weight", "normal");
+		        chart.vis.select("#numberOfConnections").remove();
 		    }
 		});
 
         //Draw the legend labels
         g.append("text")
 		.attr("x", function (d, i) {
-		    return -80 + i * 70;
+		    return -80 + i * 60;
 		})
-		.attr("y", 350)
+		.attr("y", 80)
+        .style("font-family", "Segoe UI")
+		.style("font-size", "14px")
+		.style("font-variant", "small-caps")
 		.attr("id", function (d) {
 		    return d.data.label;
 		})
@@ -494,9 +561,9 @@ BubbleChart = (function () {
 		});
         //Draw the legend circles
         g.append("circle")
-		.attr("cy", 345)
+		.attr("cy", 75)
 		.attr("cx", function (d, i) {
-		    return -90 + i * 70;
+		    return -90 + i * 60;
 		})
 		.attr("r", 5)
 		.attr("id", function (d) {
@@ -547,10 +614,11 @@ BubbleChart = (function () {
         var radius = chart.zoomed_radius;
         var arc = d3.svg.arc()
 		.outerRadius(radius)
-		.innerRadius(100);
-        var g = chart.vis.selectAll("path");
+		.innerRadius(130);
+        var g = chart.vis.selectAll("#piechart");
 
-
+        chart.vis.selectAll("#image").remove();
+        chart.vis.selectAll("#name").remove();
         return g.transition()
 		.duration(1000)
 		.attrTween("d", function (data) {
@@ -575,22 +643,70 @@ BubbleChart = (function () {
         var group = chart.vis.append("g")
 		.attr("id", "ccscale");
 
+        var gradient = group.append("defs")
+  .append("linearGradient")
+    .attr("id", "gradient")
+    .attr("x1", "0%")
+    .attr("y1", "0%")
+    .attr("x2", "100%")
+    .attr("y2", "0%")
+    .attr("spreadMethod", "pad");
+
+        gradient.append("stop")
+    .attr("offset", "0%")
+    .attr("stop-color", "#ffd314")
+    .attr("stop-opacity", 1);
+
+        gradient.append("stop")
+    .attr("offset", "30%")
+    .attr("stop-color", "#b1f413")
+    .attr("stop-opacity", 1);
+
+        gradient.append("stop")
+    .attr("offset", "80%")
+    .attr("stop-color", "#7f1ac3")
+    .attr("stop-opacity", 1);
+
+
+
+
         group.append("rect")
 		.attr("x", chart.center.x - 200)
 		.attr("y", chart.height - 47)
 		.attr("width", 400)
 		.attr("height", 10)
-		.attr("fill", "#aaaaaa");
+		.attr("fill", "url(#gradient)");
 
+        //center marker
         group.append("rect")
-		.attr("x", chart.center.x - 2)
+		.attr("x", chart.center.x - 1)
 		.attr("y", chart.height - 50)
-		.attr("width", 4)
-		.attr("height", 10)
-		.attr("fill", "#000000")
-		.transition()
-		.attr("x", scale(value))
-		.duration(1000);
+		.attr("width", 3)
+		.attr("height", 15)
+		.attr("fill", "#b1b1b1");
+
+
+        group.append("text").text("You")
+        .attr("x", chart.center.x)
+		.attr("y", chart.height - 62)
+        .attr("transform", "translate(-12,0)")
+        .style("font-family", "Segoe UI")
+		.style("font-size", "15px")
+		.style("font-variant", "small-caps")
+        .transition()
+        .duration(1000)
+        .attr("x", scale(value));
+
+        group.append("g").append("path")
+        .attr("d", d3.svg.symbol()
+        .size(function (d) { return 100; })
+        .type(function (d) { return d3.svg.symbolTypes[4]; }))
+        .attr("id", "triangle")
+        .attr("transform", "translate(" + chart.center.x + ", " + (chart.height - 52) + ")")
+        .style("fill", "b1b1b1")
+        .transition()
+        .duration(1000)
+        .attr("transform", "translate(" + scale(value) + "," + (chart.height - 52) + ")");
     };
 
     BubbleChart.prototype.undraw_scale = function () {
@@ -669,7 +785,11 @@ BubbleChart = (function () {
         years = this.vis.selectAll(".years").data(years_data);
         return years.enter().append("text").attr("class", "years").attr("x", function (d) {
             return years_x[d];
-        }).attr("y", 90).attr("text-anchor", "middle").text(function (d) {
+        })
+        .style("font-family", "Segoe UI")
+		.style("font-size", "20px")
+		.style("font-variant", "small-caps")
+        .attr("y", 90).attr("text-anchor", "middle").text(function (d) {
             return d;
         });
     };
