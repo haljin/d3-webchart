@@ -45,7 +45,7 @@ Calendar = (function () {
 		.style("font-size", "15px")
 		.style("font-variant", "small-caps")
 
-		.text("Timestamp");
+		.text("Timeframe");
 
         var button_start, start_text;
         var start = this.svg.append("g")

@@ -138,6 +138,7 @@ BubbleChart = (function () {
                     var exists = false;
                     chart.nodes.forEach(function (x) {
                         if (x.name == name) {
+                            x.callScore += d.call.duration;
                             x.callStat += d.call.duration;
                             exists = true;
                         }
@@ -217,8 +218,8 @@ BubbleChart = (function () {
         var max_amount = 0;
         //Calculate value ("final score") for each node
         chart.nodes.forEach(function (d) {
-            d.callScore *= 10;
-            d.smsScore *= 10;
+            d.callScore *= 2;
+            d.smsScore *= 2;
 
             var scores = [d.callScore, d.smsScore, d.btScore];
             var toLabel = ["call", "sms", "bt"]
@@ -244,7 +245,7 @@ BubbleChart = (function () {
             max_amount = d.value > max_amount ? d.value : max_amount;
 
         });
-        var max_radius = d3.scale.pow().exponent(0.5).domain([0, 1000000]).range([100, 60]);
+        var max_radius = d3.scale.pow().exponent(0.5).domain([0, 150000]).range([100, 60]);
         chart.radius_scale = d3.scale.pow().exponent(0.5).domain([0, max_amount]).range([2, max_radius(chart.totalCyborgScore + chart.totalCavemanScore)]);
         chart.nodes.forEach(function (d) {
             d.radius = chart.radius_scale(d.value)
@@ -732,7 +733,32 @@ BubbleChart = (function () {
         .style("fill", "b1b1b1")
         .transition()
         .duration(1000)
-        .attr("transform", "translate(" + scale(value) + "," + (chart.height - 52) + ")");
+        .attr("transform", "translate(" + scale(value) + "," + (chart.height - 52) + ")")
+        .each("end", function () {
+            var text_data;
+
+
+            var desc = group.append("text")
+             .attr("x", chart.center.x - 200)
+		    .attr("y", chart.height - 15)
+            .attr("fill", "#ffffff")
+            .style("font-family", "Segoe UI")
+		    .style("font-size", "15px")
+		    .style("font-variant", "small-caps")
+            .transition()
+            .duration(500)
+            .attr("fill", "#000000");
+
+            if (value > 1.5)
+                desc.text("You are a caveman. You contact people mostly in real life.");
+            else if (value < 0.5)
+                desc.text("You are a cyborg. You contact people mostly by various media.");
+            else
+                desc
+                .attr("x", chart.center.x - 230)
+                .text("You are balanced. You contact people both in real-life and using various media.");
+
+        });
     };
 
     BubbleChart.prototype.undraw_scale = function () {
