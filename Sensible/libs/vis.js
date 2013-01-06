@@ -127,12 +127,12 @@ BubbleChart = (function () {
 
         //Parse Call data
         chart.callData.forEach(function (d) {
-            if (d.call.name != "" && d.timestamp > chart.startTime && d.timestamp < chart.endTime) {
+            if (d.call.number != "" && d.timestamp > chart.startTime && d.timestamp < chart.endTime) {
                 if (d.call.duration > 5) {
                     var node;
                     var exists = false;
                     chart.nodes.forEach(function (x) {
-                        if (x.name == extractNumber(d.call.name)) {
+                        if (x.name == extractNumber(d.call.number)) {
                             x.callStat += d.call.duration;
                             exists = true;
                         }
@@ -151,11 +151,11 @@ BubbleChart = (function () {
 
         //Parse SMS data
         chart.smsData.forEach(function (d) {
-            if (d.message.person != "" && d.timestamp > chart.startTime && d.timestamp < chart.endTime) {
+            if (d.message.address != "" && d.timestamp > chart.startTime && d.timestamp < chart.endTime) {
                 var node;
                 var exists = false;
                 chart.nodes.forEach(function (x) {
-                    if (x.name == extractNumber(d.message.person)) {
+                    if (x.name == extractNumber(d.message.address)) {
                         x.smsScore += 30;
                         x.smsStat += 1;
                         exists = true;
@@ -163,7 +163,7 @@ BubbleChart = (function () {
 
                 });
                 if (!exists) {
-                    node = createNode(currElem, extractNumber(d.message.person), 0, 30, 0);
+                    node = createNode(currElem, extractNumber(d.message.address), 0, 30, 0);
                     node.smsStat += 1;
                     currElem++;
                     return chart.nodes.push(node);
@@ -250,9 +250,12 @@ BubbleChart = (function () {
 
         if (!this.nodes.length) {
             this.vis.append("text")
-            .attr("x", chart.center.x - 50)
+            .attr("x", chart.center.x - 190)
             .attr("y", chart.center.y)
             .attr("size", 20)
+            .style("font-family", "Segoe UI")
+		    .style("font-size", "30px")
+		    .style("font-variant", "small-caps")
             .text("No data for selected time period");
 
         }
@@ -402,7 +405,7 @@ BubbleChart = (function () {
         var radius = chart.zoomed_radius;
         var color = d3.scale.ordinal()
 		.range(this.colors);
-        var data = [{ value: 30, label: "Calls" }, { value: 30, label: "Sms" }, { value: 60, label: "Bluetooth"}];
+        var data = [{ value: d.callScore, label: "Calls" }, { value: d.smsScore, label: "Sms" }, { value: d.btScore, label: "Bluetooth"}];
 
         var arc = d3.svg.arc()
 		.outerRadius(radius)
