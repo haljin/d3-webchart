@@ -54,7 +54,7 @@ BubbleChart = (function () {
         this.endTime;
         this.mode = 0;
         this.inTransition = false;
-        var date = new Date(Date.now()); 
+        var date = new Date(Date.now());
         date.setMonth(date.getMonth() - 1)
 
         this.load_data(0, Date.now());
@@ -124,7 +124,6 @@ BubbleChart = (function () {
                 btStat: 0
             }
         }
-
         //Parse Call data
         chart.callData.forEach(function (d) {
             if (d.call.number != "" && d.timestamp > chart.startTime && d.timestamp < chart.endTime) {
@@ -245,9 +244,10 @@ BubbleChart = (function () {
 
     BubbleChart.prototype.create_vis = function () {
         var chart = this;
-
-        this.vis = d3.select("#vis").append("svg").attr("width", this.width).attr("height", this.height).attr("id", "svg_vis");
-
+        if (d3.select("#svg_vis").empty())
+            this.vis = d3.select("#vis").append("svg").attr("width", "100%").attr("height", "100%").attr("id", "svg_vis").style("display", "inline-block").append("g").attr("id", "bubblechart");
+        else
+            this.vis = d3.select("#svg_vis").append("g").attr("id", "bubblechart");
         if (!this.nodes.length) {
             this.vis.append("text")
             .attr("x", chart.center.x - 190)
@@ -460,7 +460,7 @@ BubbleChart = (function () {
                 .attr("id", "name")
 		        .attr("y", 450)
 		        .text(function () { return chart.clicked.name; })
-         .style("font-size",text_scale(chart.clicked.name.length)) ;
+         .style("font-size", text_scale(chart.clicked.name.length));
 
 
         paths
@@ -490,8 +490,8 @@ BubbleChart = (function () {
 
 		        chart.vis.append("text")
 		        .attr("x", function () {
-		            if (d.data.label == "Calls") 
-		                 return 415;
+		            if (d.data.label == "Calls")
+		                return 415;
 		            else if (d.data.label == "Sms")
 		                return 445;
 		            else if (d.data.label == "Bluetooth")
@@ -854,7 +854,7 @@ BubbleChart = (function () {
 		.startAngle(function (d) { return d.startAngle; })
 		.endAngle(function (d) { return d.endAngle; });
 
-        var load_screen = d3.select("#vis").append("svg").attr("width", this.width).attr("height", this.height).attr("id", "svg_load");
+        var load_screen = d3.select("#vis").append("svg").attr("width", "100%").attr("height", "100%").attr("id", "svg_load");
         var svg = load_screen
 		.append("g")
 		.attr("transform", "translate(" + this.center.x + "," + this.center.y + ")");
@@ -902,6 +902,16 @@ BubbleChart = (function () {
         d3.select("#svg_load").remove();
     };
 
+    BubbleChart.prototype.reset = function () {
+        this.nodes = [];
+        this.totalCyborgScore = 0;
+        this.totalCavemanScore = 0;
+        this.zoomed = false;
+        this.clicked = null;
+        this.mode = 0;
+        this.inTransition = false;
+    };
+
     return BubbleChart;
 
 
@@ -911,7 +921,7 @@ BubbleChart = (function () {
 root = typeof exports !== "undefined" && exports !== null ? exports : this;
 
 $(function () {
-    var chart = null;
+    chart = null;
     var token = "32d74aa9-211e-4bbd-b99d-9af5aebb370d";
     var timeline = null;
     
