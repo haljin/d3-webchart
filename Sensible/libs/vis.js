@@ -126,19 +126,25 @@ BubbleChart = (function () {
         }
         //Parse Call data
         chart.callData.forEach(function (d) {
-            if (d.call.number != "" && d.timestamp > chart.startTime && d.timestamp < chart.endTime) {
+            var name;
+            fake.forEach(function (l) {
+                if (l.number == extractNumber(d.call.number))
+                    name = l.real_name;
+            });
+            if (name && d.timestamp > chart.startTime && d.timestamp < chart.endTime) {
+
                 if (d.call.duration > 5) {
                     var node;
                     var exists = false;
                     chart.nodes.forEach(function (x) {
-                        if (x.name == extractNumber(d.call.number)) {
+                        if (x.name == name) {
                             x.callStat += d.call.duration;
                             exists = true;
                         }
 
                     });
                     if (!exists) {
-                        node = createNode(currElem, extractNumber(d.call.number), d.call.duration, 0, 0);
+                        node = createNode(currElem, name, d.call.duration, 0, 0);
                         node.callStat += d.call.duration;
                         currElem++;
                         return chart.nodes.push(node);
@@ -150,11 +156,16 @@ BubbleChart = (function () {
 
         //Parse SMS data
         chart.smsData.forEach(function (d) {
-            if (d.message.address != "" && d.timestamp > chart.startTime && d.timestamp < chart.endTime) {
+            var name;
+            fake.forEach(function (l) {
+                if (l.number == extractNumber(d.message.address))
+                    name = l.real_name;
+            });
+            if (name && d.timestamp > chart.startTime && d.timestamp < chart.endTime) {
                 var node;
                 var exists = false;
                 chart.nodes.forEach(function (x) {
-                    if (x.name == extractNumber(d.message.address)) {
+                    if (x.name == name) {
                         x.smsScore += 30;
                         x.smsStat += 1;
                         exists = true;
@@ -162,7 +173,7 @@ BubbleChart = (function () {
 
                 });
                 if (!exists) {
-                    node = createNode(currElem, extractNumber(d.message.address), 0, 30, 0);
+                    node = createNode(currElem, name, 0, 30, 0);
                     node.smsStat += 1;
                     currElem++;
                     return chart.nodes.push(node);
@@ -173,12 +184,17 @@ BubbleChart = (function () {
         //Parse Bluetooth data
         chart.btData.forEach(function (d) {
             d.devices.forEach(function (x) {
+                var name;
+                fake.forEach(function (l) {
+                    if (x.sensible_user_id == l.sensible_user_id)
+                        name = l.real_name;
+                });
                 var lastContact = 0;
-                if (x.sensible_user_id != "" && x.sensible_user_id != null && d.timestamp > chart.startTime && d.timestamp < chart.endTime) {
+                if (name && d.timestamp > chart.startTime && d.timestamp < chart.endTime) {
                     var node;
                     var exists = false;
                     chart.nodes.forEach(function (e) {
-                        if (e.name == x.sensible_user_id) {
+                        if (e.name == name) {
                             e.btScore += (e.lastContact - Date.now() > 300000) ? 300 : 30;
                             e.lastContact = d.timestamp;
                             e.btStat += 1;
@@ -187,7 +203,7 @@ BubbleChart = (function () {
 
                     });
                     if (!exists) {
-                        node = createNode(currElem, x.sensible_user_id, 0, 0, 30);
+                        node = createNode(currElem, name, 0, 0, 30);
                         node.lastContact = d.timestamp;
                         node.btStat += 1;
                         currElem++;
@@ -201,6 +217,9 @@ BubbleChart = (function () {
         var max_amount = 0;
         //Calculate value ("final score") for each node
         chart.nodes.forEach(function (d) {
+            d.callScore *= 10;
+            d.smsScore *= 10;
+
             var scores = [d.callScore, d.smsScore, d.btScore];
             var toLabel = ["call", "sms", "bt"]
             var maxIndex = 0, maxValue = 0;
@@ -210,8 +229,7 @@ BubbleChart = (function () {
                     maxValue = scores[i];
                 }
 
-            d.callScore *= 2;
-            d.smsScore *= 2;
+
             d.value = d.callScore + d.smsScore + d.btScore;
             d.group = toLabel[maxIndex];
 
@@ -226,7 +244,7 @@ BubbleChart = (function () {
             max_amount = d.value > max_amount ? d.value : max_amount;
 
         });
-        var max_radius = d3.scale.pow().exponent(0.5).domain([0, 120000]).range([100, 60]);
+        var max_radius = d3.scale.pow().exponent(0.5).domain([0, 1000000]).range([100, 60]);
         chart.radius_scale = d3.scale.pow().exponent(0.5).domain([0, max_amount]).range([2, max_radius(chart.totalCyborgScore + chart.totalCavemanScore)]);
         chart.nodes.forEach(function (d) {
             d.radius = chart.radius_scale(d.value)
@@ -303,7 +321,9 @@ BubbleChart = (function () {
 		.on("mouseout", function () {
 		    button.attr("fill", "#dddddd");
 		});
-        button = group.append("rect")
+
+        if (this.nodes.length) {
+            button = group.append("rect")
 		.attr("id", "split")
 		.attr("x", this.center.x - 50)
 		.attr("y", 10)
@@ -313,7 +333,7 @@ BubbleChart = (function () {
 		.attr("stroke", "#aaaaaa")
 		.attr("stroke-width", 0.25);
 
-        button_text = group.append("text")
+            button_text = group.append("text")
 		.attr("id", "button_text")
 		.attr("x", this.center.x - 40)
 		.attr("y", 30)
@@ -322,7 +342,7 @@ BubbleChart = (function () {
 		.style("font-size", "15px")
 		.style("font-variant", "small-caps")
 		.text("Show scale");
-
+        }
         return this.circles.transition().duration(2000).attr("r", function (d) {
             return d.radius;
         });
@@ -447,6 +467,7 @@ BubbleChart = (function () {
 
         var paths = g.selectAll("path");
         var text_scale = d3.scale.pow().domain([33, 50]).range([13, 6]).clamp(true);
+        var text_scale_change_pos = d3.scale.linear().domain([10, 50]).range([440, 350]).clamp(true);
         chart.vis.append("image")
                 .attr("id", "image")
                 .attr("xlink:href", "http://localhost:5777/Sensible/data/unknown-person.gif")
@@ -456,9 +477,11 @@ BubbleChart = (function () {
                 .attr("height", 180);
 
         chart.vis.append("text")
-		        .attr("x", 355)
+		        .attr("x", text_scale_change_pos(chart.clicked.name.length))
                 .attr("id", "name")
 		        .attr("y", 450)
+                .style("font-family", "Segoe UI")
+		        .style("font-variant", "small-caps")
 		        .text(function () { return chart.clicked.name; })
          .style("font-size", text_scale(chart.clicked.name.length));
 
@@ -638,7 +661,7 @@ BubbleChart = (function () {
     BubbleChart.prototype.draw_scale = function () {
         var chart = this;
         var value = chart.totalCavemanScore / chart.totalCyborgScore;
-        value = 0.7;
+
         var scale = value >= 1 ?
 							d3.scale.pow().exponent(0.5).domain([1, 2]).range([chart.center.x - 2, chart.center.x + 198]).clamp(true) :
 							d3.scale.pow().exponent(0.5).domain([1, 0]).range([chart.center.x - 2, chart.center.x - 202]).clamp(true);
@@ -760,7 +783,9 @@ BubbleChart = (function () {
                 return d.y;
             });
         });
+
         chart.vis.select("#button_text").text("Hide scale").attr("x", this.center.x - 35);
+
         this.force.start();
         this.draw_scale();
         return this.display_years();

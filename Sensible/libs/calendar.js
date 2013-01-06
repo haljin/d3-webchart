@@ -34,7 +34,7 @@ Calendar = (function () {
 		.attr("y", 10)
 		.attr("width", 90)
 		.attr("height", 30)
-		.attr("fill", "#dddddd")
+		.attr("fill", "#aaaaaa")
 		.attr("stroke", "#aaaaaa")
 		.attr("stroke-width", 0.25);
 
@@ -44,11 +44,13 @@ Calendar = (function () {
 		.style("font-family", "Segoe UI")
 		.style("font-size", "15px")
 		.style("font-variant", "small-caps")
+
 		.text("Timestamp");
 
         var button_start, start_text;
         var start = this.svg.append("g")
         .style("cursor", "hand")
+
 		.on("click", function () {
 		    if (chart) {
 		        calendar.svg.selectAll(".yearsb").remove();
