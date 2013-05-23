@@ -33,10 +33,10 @@ BubbleChart = (function () {
         this.colors = ["#b1f413", "#ffd314", "#7f1ac3"];
         this.fill_color = d3.scale.ordinal().domain(["call", "sms", "bt"]).range(this.colors);
         this.radius_scale;
-
+        
         //Data fields
         this.token = token;
-        this.baseUrl = "http://localhost:5777/Sensible/data"
+        this.baseUrl = "https://curie.imm.dtu.dk/sensible_outbound/v1"
         this.callData;
         this.smsData;
         this.btData;
@@ -66,9 +66,10 @@ BubbleChart = (function () {
         var runOnce = [false, false, false];
         this.startTime = start;
         this.endTime = end;
+        
 
         //Load Call probe data
-        d3.json(chart.baseUrl + "/call_log/" + chart.token, function (data) {
+        d3.jsonp(chart.baseUrl + "/call_log/?dev_token=" + chart.token + "&limit=100&callback=parse", function (data) {
             if (!runOnce[0]) {
                 runOnce[0] = true;
                 chart.callData = data;
@@ -77,7 +78,7 @@ BubbleChart = (function () {
             }
         });
         //Load SMS probe data
-        d3.json(chart.baseUrl + "/sms/" + chart.token, function (data) {
+        d3.jsonp(chart.baseUrl + "/sms/?dev_token=" + chart.token + "&limit=100&callback=parse", function (data) {
 
             if (!runOnce[1]) {
                 runOnce[1] = true;
@@ -87,7 +88,7 @@ BubbleChart = (function () {
             }
         });
         //Load Bluetooth probe data
-        d3.json(chart.baseUrl + "/bluetooth/" + chart.token, function (data) {
+        d3.jsonp(chart.baseUrl + "/bluetooth/?dev_token=" + chart.token + "&limit=100&callback=parse", function (data) {
             if (!runOnce[2]) {
                 runOnce[2] = true;
                 chart.btData = data;
@@ -968,14 +969,15 @@ BubbleChart = (function () {
 
 })();
 
+var parseResponse = function (data) { return data; };
 
 root = typeof exports !== "undefined" && exports !== null ? exports : this;
 
 $(function () {
     chart = null;
-    var token = "32d74aa9-211e-4bbd-b99d-9af5aebb370d";
+    var token = "deca86ae4bac4d8caff4dec795f4d837";// "32d74aa9-211e-4bbd-b99d-9af5aebb370d";
     var timeline = null;
-    
+
     chart = new BubbleChart(token);
     return chart.show_loading_screen();
 });
