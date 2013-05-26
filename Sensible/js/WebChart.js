@@ -4,23 +4,33 @@ WebChart = (function () {
     function WebChart(token) {
 
         //Layout fields
-        this.width = 940;
+        this.width = 1200;
         this.height = 800;
         this.center = {
             x: this.width / 2,
             y: this.height / 2
         };
+        this.zoomed_loc = {
+            x: this.width / 6 + 20,
+            y: this.height / 4 + 20
+        };
 
         this.layout_gravity = -0.01;
         this.damper = 0.1;
-        this.zoomed_radius = 200;
+        this.zoomed_radius = 120;
         this.vis = null;
         this.web = null;
         this.details = null;
         this.force = null;
-        this.colors = ["#b1f413", "#ffd314", "#7f1ac3"];
-        this.fill_color = d3.scale.ordinal().domain(["call", "sms", "bt"]).range(this.colors);
         this.radius_scale;
+        this.colors = { call: "#b1f413", sms: "#ffd314", bt: "#7f1ac3" };
+        this.shapes = {
+            call: "04,00 08,04 05,07 05,08 13,16 14,16 17,13 21,16 17,21 12,21 00,09 00,04 04,00",
+            sms: "00,00 25,00 25,15 00,15 00,00 13,7 25,00",
+            bt: "00,07 05,10 05,00 12,05 05,10 12,15 05,20 05,10 00,13"
+        };
+
+        
 
         //Data fields
         this.token = token;
@@ -201,16 +211,17 @@ WebChart = (function () {
             chart.maxSmsScore = d.smsScore > chart.maxSmsScore ? d.smsScore : chart.maxSmsScore;
         });
         //Calculate value ("final score") for each node
-        chart.nodes.forEach(function (d) {
+        chart.nodes.forEach(function (d) {         
+            //Normalize            
+            d.smsScore /= chart.maxSmsScore;
+            d.btScore /= chart.maxBtScore;
+            d.callScore /= chart.maxCallScore;
+
             var scores = [d.callScore, d.smsScore, d.btScore];
             var toLabel = ["call", "sms", "bt"]
             var maxIndex = 0;
 
             maxIndex = scores.indexOf(Math.max.apply(null, scores));
-            d.smsScore /= chart.maxSmsScore;
-            d.btScore /= chart.maxBtScore;
-            d.callScore /= chart.maxCallScore;
-
             d.value = d.callScore + d.smsScore + d.btScore;
             d.group = toLabel[maxIndex];
 
@@ -261,9 +272,9 @@ WebChart = (function () {
 
         //Draw circles
         this.circles.enter().append("circle").attr("r", 0).attr("fill", function (d) {
-            return chart.fill_color(d.group);
+            return chart.colors[d.group];
         }).attr("stroke-width", 2).attr("stroke", function (d) {
-            return d3.rgb(chart.fill_color(d.group)).darker();
+            return d3.rgb(chart.colors[d.group]).darker();
         }).attr("id", function (d) {
             return "bubble_" + d.id;
         }).on("mouseover", function (d, i) {
@@ -303,35 +314,35 @@ WebChart = (function () {
         //Darken other circles
         other_circles.transition().duration(2000)
             .attr("fill", function (d) {
-                return d3.rgb(chart.fill_color(d.group)).darker().darker().darker();
+                return d3.rgb(chart.colors[d.group]).darker().darker().darker();
             })
             .attr("stroke-width", 2)
             .attr("stroke", function (d) {
-                return d3.rgb(chart.fill_color(d.group)).darker().darker().darker().darker();
+                return d3.rgb(chart.colors[d.group]).darker().darker().darker().darker();
             });
 
         //Zoom out the rest of the visualization
         this.web.transition().duration(2000)
         .attr("transform", function (d) {
-            return "scale(0.2)";
+            return "scale(0.15)";
         });
 
         //Create new zoomed circle
         return new_circle.append("circle").attr("r", 10).attr("id", "circle-zoomed")
 		.attr("cx", d.x)
 		.attr("cy", d.y)
-		.attr("fill", this.fill_color(d.group))
+		.attr("fill", chart.colors[d.group])
 		.attr("stroke-width", 2)
-		.attr("stroke", d3.rgb(this.fill_color(d.group)).darker())
+		.attr("stroke", d3.rgb(chart.colors[d.group]).darker())
 		.transition()
 		.ease("elastic")
-		.attr("cx", this.center.x)
-		.attr("cy", this.center.y)
+		.attr("cx", this.zoomed_loc.x)
+		.attr("cy", this.zoomed_loc.y)
 		.duration(2000)
 		.attr("r", chart.zoomed_radius)
 		.each('end', function () {
 		    if (chart.zoomed)
-		        chart.draw_pie_chart(chart, d);
+		        chart.draw_details(d);
 
 		});
     };
@@ -342,16 +353,16 @@ WebChart = (function () {
         var new_circle = this.vis.selectAll("#circle-zoomed");
         //Lighten other circles
         other_circles.transition().duration(2000).attr("fill", function (d) {
-            return d3.rgb(chart.fill_color(d.group));
+            return d3.rgb(chart.colors[d.group]);
         }).attr("stroke-width", 2).attr("stroke", function (d) {
-            return d3.rgb(chart.fill_color(d.group)).darker();
+            return d3.rgb(chart.colors[d.group]).darker();
         });
         this.web.transition().duration(2000)
         .attr("transform", function (d) {
             return "scale(1)";
         });
         //Destroy the pie chart, unzoom the circle
-        chart.undraw_pie_chart(chart).each('end', function () {
+        chart.undraw_pie_chart().each('end', function () {
             new_circle
 			.transition()
 			.attr("cx", chart.clicked.x)
@@ -371,185 +382,159 @@ WebChart = (function () {
 
     };
 
-    WebChart.prototype.draw_pie_chart = function (chart, d) {
+    WebChart.prototype.draw_details = function (d) {
+
+        this.draw_pie_chart(d);
+        
+
+
+    };
+
+    WebChart.prototype.draw_pie_chart = function (d) {
         var chart = this;
-        var radius = chart.zoomed_radius;
-        var color = d3.scale.ordinal()
-		.range(this.colors);
         var data = [{ value: d.callScore, label: "Calls" }, { value: d.smsScore, label: "Sms" }, { value: d.btScore, label: "Bluetooth" }];
 
         var arc = d3.svg.arc()
-		.outerRadius(radius)
-		.innerRadius(130);
+            .outerRadius(chart.zoomed_radius)
+            .innerRadius(chart.zoomed_radius - 40);
         var pie = d3.layout.pie()
-		.sort(null)
-		.value(function (d) { return d.value; });
+            .sort(null)
+            .value(function (d) { return d.value; });
         var toLabel = ["call", "sms", "bt"]
 
         var svg = chart.details
-		.append("g")
-		.attr("transform", "translate(" + this.center.x + "," + this.center.y + ")")
-		.attr("id", "pie");
+            .append("g")
+            .attr("transform", "translate(" + this.zoomed_loc.x + "," + this.zoomed_loc.y + ")")
+            .attr("id", "pie");
 
         var g = svg.selectAll(".arc")
-		.data(pie(data))
-		.enter().append("g")
-		.attr("class", "arc");
+            .data(pie(data))
+            .enter().append("g")
+            .attr("class", "arc");
 
         g.append("path")
-		.attr("d", arc)
-        .attr("id", "piechart")
-		.style("fill", function (d, i) { return color(toLabel[i]); })
-		.attr("stroke", function (d, i) {
-		    return d3.rgb(chart.fill_color(color(toLabel[i]))).darker();
-		})
-		.style("stroke-width", "2px")
-		.transition().duration(1000).attrTween("d", function (data) {
-		    var interpolation = d3.interpolate({ startAngle: 0, endAngle: 0 }, data);
-		    this._current = interpolation(0);
-		    return function (t) {
-		        return arc(interpolation(t));
-		    };
-		})
-		.each("end", function () {
-		    this._listenToEvents = true;
-		    chart.inTransition = false;
-		});
+            .attr("d", arc)
+            .attr("id", "piechart")
+            .style("fill", function (d, i) {
+                return chart.colors[toLabel[i]];
+            })
+            .attr("stroke", function (d, i) {
+                return d3.rgb(chart.colors[toLabel[i]]).darker();
+            })
+            .style("stroke-width", "2px")
+            .transition().duration(1000).attrTween("d", function (data) {
+                var interpolation = d3.interpolate({ startAngle: 0, endAngle: 0 }, data);
+                this._current = interpolation(0);
+                return function (t) {
+                    return arc(interpolation(t));
+                };
+            })
+            .each("end", function () {
+                this._listenToEvents = true;
+                chart.inTransition = false;
+            });
+
+        //Draw the symbols
+        g.append("polyline")
+            .attr("transform", function (d) {
+                return "translate(" + Math.cos(((d.startAngle + d.endAngle - Math.PI) / 2)) * (chart.zoomed_radius + 30) + "," + Math.sin((d.startAngle + d.endAngle - Math.PI) / 2) * (chart.zoomed_radius + 30) + ")";
+            })
+            .attr("stroke", function (d, i) {
+                return chart.colors[toLabel[i]];
+            })
+            .attr("class", "symbol")
+            .style("stroke-width", "2px")
+            .style("fill", "none")
+            .attr("points", function (d, i) {
+                return chart.shapes[toLabel[i]];
+            });
+
 
         var paths = g.selectAll("path");
-        var text_scale = d3.scale.pow().domain([33, 50]).range([13, 6]).clamp(true);
-        var text_scale_change_pos = d3.scale.linear().domain([10, 50]).range([440, 350]).clamp(true);
+        var text_scale = d3.scale.pow().domain([33, 50]).range([50, 30]).clamp(true);
+
         chart.details.append("image")
-                .attr("id", "userAvatar")
-                .attr("xlink:href", "http://localhost:5777/Sensible/data/unknown-person.gif")
-                .attr("x", 425)
-                .attr("y", 280)
-                .attr("width", 100)
-                .attr("height", 180);
+            .attr("id", "userAvatar")
+            .attr("xlink:href", "data/unknown-person.gif")
+            .attr("x", 170)
+            .attr("y", 130)
+            .attr("width", 100)
+            .attr("height", 180);
 
         chart.details.append("text")
-		        .attr("x", text_scale_change_pos(chart.clicked.name.length))
-                .attr("id", "userName")
-		        .attr("y", 450)
-                .style("font-family", "Segoe UI")
-		        .style("font-variant", "small-caps")
-		        .text(function () { return chart.clicked.name; })
-         .style("font-size", text_scale(chart.clicked.name.length));
+            .attr("x", 400)
+            .attr("id", "userName")
+            .attr("y", 130)
+            .style("font-family", "Segoe UI")
+            .style("font-variant", "small-caps")
+            .text(function () { return chart.clicked.name; })
+            .style("font-size", text_scale(chart.clicked.name.length));
 
 
         paths
-		.on("mouseover", function (d) {
-		    // Mouseover effect if no transition has started                
-		    if (this._listenToEvents) {
-		        // Calculate angle bisector
-		        var ang = d.startAngle + (d.endAngle - d.startAngle) / 2;
-		        // Transformate to SVG space
-		        ang = (ang - (Math.PI / 2)) * -1;
+            .on("mouseover", function (d) {          
+                if (this._listenToEvents) {
+                    // Calculate angle bisector
+                    var ang = d.startAngle + (d.endAngle - d.startAngle) / 2;
+                    // Transformate to SVG space
+                    ang = (ang - (Math.PI / 2)) * -1;
 
-		        // Calculate a 10% radius displacement
-		        var x = Math.cos(ang) * radius * 0.1;
-		        var y = Math.sin(ang) * radius * -0.1;
+                    d3.select(this).transition()
+                        .duration(150).attr("transform", "scale(1.2,1.2)");
+                    chart.details.selectAll(".symbol").transition().duration(150).attr("transform", function (d) {
+                        return "translate(" + Math.cos(((d.startAngle + d.endAngle - Math.PI) / 2)) * (chart.zoomed_radius + 45) + "," + Math.sin((d.startAngle + d.endAngle - Math.PI) / 2) * (chart.zoomed_radius + 45) + ")";
+                    });
 
-		        d3.select(this).transition()
-			    .duration(250).attr("transform", "translate(" + x + "," + y + ")");
+                    chart.details.append("text")
+                        .attr("x", 170)
+                        .attr("id", "numberOfConnections")
+                        .attr("y", 420)
+                        .style("font-family", "Segoe UI")
+                        .style("font-size", "15px")
+                        .style("font-variant", "small-caps")
+                        .text(function () {
+                            if (d.data.label == "Calls") {
+                                var content = "";
+                                var rest;
+                                var hours = Math.floor(chart.clicked.callStat / 3600);
+                                rest = chart.clicked.callStat % 3600;
+                                var minutes = Math.floor(rest / 60);
+                                rest = rest % 60;
+                                content += hours;
+                                if (minutes < 10)
+                                    content += ":0" + minutes;
+                                else
+                                    content += ":" + minutes;
+                                if (rest < 10)
+                                    content += ":0" + rest + " time in call";
+                                else
+                                    content += ":" + rest + " time in call";
+                                return content;
+                            }
+                            else if (d.data.label == "Sms")
+                                return chart.clicked.smsStat + " messages";
+                            else if (d.data.label == "Bluetooth")
+                                return chart.clicked.btStat + " connections";
+                        });
+                }
+            })
+            .on("mouseout", function (d) {          
+                if (this._listenToEvents) {
+                    d3.select(this).transition()
+                    .duration(150).attr("transform", "scale(1,1)");
 
-		        chart.vis.selectAll("#" + d.data.label)
-			    .attr("stroke-width", 2)
-			    .attr("r", 6)
-			    .style("font-weight", "bold");
+                    chart.details.selectAll(".symbol").transition().duration(150).attr("transform", function (d) {
+                        return "translate(" + Math.cos(((d.startAngle + d.endAngle - Math.PI) / 2)) * (chart.zoomed_radius + 30) + "," + Math.sin((d.startAngle + d.endAngle - Math.PI) / 2) * (chart.zoomed_radius + 30) + ")";
+                    });
+                    chart.details.selectAll("#" + d.data.label)
+                    .attr("stroke-width", 1)
+                    .attr("r", 5)
+                    .style("font-weight", "normal");
+                    chart.vis.select("#numberOfConnections").remove();
+                }
+            });     
 
-
-		        chart.details.append("text")
-		        .attr("x", function () {
-		            if (d.data.label == "Calls")
-		                return 415;
-		            else if (d.data.label == "Sms")
-		                return 445;
-		            else if (d.data.label == "Bluetooth")
-		                return 435;
-
-		        })
-                .attr("id", "numberOfConnections")
-		        .attr("y", 500)
-                .style("font-family", "Segoe UI")
-		        .style("font-size", "15px")
-		        .style("font-variant", "small-caps")
-		        .text(function () {
-		            if (d.data.label == "Calls") {
-		                var content = "";
-		                var rest;
-		                var hours = Math.floor(chart.clicked.callStat / 3600);
-		                rest = chart.clicked.callStat % 3600;
-		                var minutes = Math.floor(rest / 60);
-		                rest = rest % 60;
-		                content += hours;
-		                if (minutes < 10)
-		                    content += ":0" + minutes;
-		                else
-		                    content += ":" + minutes;
-		                if (rest < 10)
-		                    content += ":0" + rest + " time in call";
-		                else
-		                    content += ":" + rest + " time in call";
-
-
-		                return content;
-		            }
-		            else if (d.data.label == "Sms")
-		                return chart.clicked.smsStat + " messages";
-		            else if (d.data.label == "Bluetooth")
-		                return chart.clicked.btStat + " connections";
-
-		        });
-
-		    }
-		})
-		.on("mouseout", function (d) {
-		    // Mouseout effect if no transition has started                
-		    if (this._listenToEvents) {
-		        d3.select(this).transition()
-				.duration(150).attr("transform", "translate(0,0)");
-
-		        chart.details.selectAll("#" + d.data.label)
-				.attr("stroke-width", 1)
-				.attr("r", 5)
-				.style("font-weight", "normal");
-		        chart.vis.select("#numberOfConnections").remove();
-		    }
-		});
-
-        //Draw the legend labels
-        g.append("text")
-		.attr("x", function (d, i) {
-		    return -80 + i * 60;
-		})
-		.attr("y", 80)
-        .style("font-family", "Segoe UI")
-		.style("font-size", "14px")
-		.style("font-variant", "small-caps")
-		.attr("id", function (d) {
-		    return d.data.label;
-		})
-		.text(function (d) {
-		    return d.data.label;
-		});
-        //Draw the legend circles
-        g.append("circle")
-		.attr("cy", 75)
-		.attr("cx", function (d, i) {
-		    return -90 + i * 60;
-		})
-		.attr("r", 5)
-		.attr("id", function (d) {
-		    return d.data.label;
-		})
-		.attr("stroke", "#000")
-		.attr("stroke-width", 1)
-		.attr("fill", function (d, i) {
-		    return color(toLabel[i]);
-		});
         //Draw the unzoom button
-
         var button, button_text;
         var group = this.details.append("g")
         .attr("id", "button-unzoom")
@@ -564,16 +549,16 @@ WebChart = (function () {
 		});
 
         button = group.append("rect")
-	.attr("x", this.center.x + 250)
-		.attr("y", 10)
-		.attr("width", 30)
-		.attr("height", 30)
-		.attr("fill", "#dddddd")
-		.attr("stroke", "#aaaaaa")
-		.attr("stroke-width", 0.25);
+            .attr("x", chart.width - 30)
+            .attr("y", 10)
+            .attr("width", 30)
+            .attr("height", 30)
+            .attr("fill", "#dddddd")
+            .attr("stroke", "#aaaaaa")
+            .attr("stroke-width", 0.25);
 
         button_text = group.append("text")
-		.attr("x", this.center.x + 260)
+		.attr("x", chart.width - 20)
 		.attr("y", 30)
 		.style("cursor", "hand")
 		.style("font-family", "Segoe UI")
@@ -583,11 +568,11 @@ WebChart = (function () {
 		.text("x");
     };
 
-    WebChart.prototype.undraw_pie_chart = function (chart) {
+    WebChart.prototype.undraw_pie_chart = function () {
         var radius = chart.zoomed_radius;
         var arc = d3.svg.arc()
 		.outerRadius(radius)
-		.innerRadius(130);
+		.innerRadius(radius - 20);
         var g = chart.vis.selectAll("#piechart");
 
         chart.vis.selectAll("#userAvatar").remove();
@@ -666,7 +651,7 @@ WebChart = (function () {
         var chart = this;
         if (!this.zoomed) {
             d3.select(element).attr("stroke", function (d) {
-                return d3.rgb(chart.fill_color(d.group)).darker();
+                return d3.rgb(chart.colors[d.group]).darker();
             });
         }
         return this.tooltip.hideTooltip();
@@ -745,8 +730,6 @@ WebChart = (function () {
         this.mode = 0;
         this.inTransition = false;
     };
-
-    
 
     return WebChart;
 
