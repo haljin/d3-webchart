@@ -240,8 +240,8 @@ WebChart = (function () {
         
         chart.hide_loading_screen();
         chart.create_vis();
-        chart.start();
-        return chart.display_group_all();
+        //chart.start();
+        //return chart.display_group_all();
     };
 
     WebChart.prototype.create_vis = function () {
@@ -266,38 +266,170 @@ WebChart = (function () {
 
         this.web = this.vis.append("g").attr("id", "Web");
         this.details = this.vis.append("g").attr("id", "Details");
-        this.circles = this.web.selectAll("circle").data(this.nodes, function (d) {
+        this.circles = this.web.selectAll("circle").data(this.nodes.slice(0,1), function (d) {
             return d.id;
         });
 
-        //Draw circles
-        this.circles.enter().append("circle").attr("r", 0).attr("fill", function (d) {
-            return chart.colors[d.group];
-        }).attr("stroke-width", 2).attr("stroke", function (d) {
-            return d3.rgb(chart.colors[d.group]).darker();
-        }).attr("id", function (d) {
-            return "bubble_" + d.id;
-        }).on("mouseover", function (d, i) {
-            return chart.show_details(d, i, this);
-        }).on("mouseout", function (d, i) {
-            return chart.hide_details(d, i, this);
-        }).on("click", function (d, i) {
-            if (!chart.inTransition)
-                if (chart.zoomed == false) {
-                    chart.inTransition = true;
-                    chart.hide_details(d, i, this);
-                    return chart.zoom_circle(d);
-                }
-                else {
-                    chart.inTransition = true;
-                    return chart.unzoom_circle();
-                }
-        });
+        
+      
 
+        //Draw circles
+
+        //this.circles.enter().append("circle").attr("r", 0).attr("fill", function (d) {
+        //    return chart.fill_color(d.group);
+        //}).attr("stroke-width", 2).attr("stroke", function (d) {
+        //    return d3.rgb(chart.fill_color(d.group)).darker();
+        //}).attr("id", function (d) {
+        //    return "bubble_" + d.id;
+        //}).on("mouseover", function (d, i) {
+        //    return chart.show_details(d, i, this);
+        //}).on("mouseout", function (d, i) {
+        //    return chart.hide_details(d, i, this);
+        //}).on("click", function (d, i) {
+        //    if (!chart.inTransition)
+        //        if (chart.zoomed == false) {
+        //            chart.inTransition = true;
+        //            chart.hide_details(d, i, this);
+        //            return chart.zoom_circle(d);
+        //        }
+        //        else {
+        //            chart.inTransition = true;
+        //            return chart.unzoom_circle();
+        //        }
+        //});
+
+        //return this.circles.transition().duration(2000).attr("r", function (d) {
+        //    return d.radius;
+        //});
+        var getPoints = function(radius, segments, levels) {
+            points = {
+                all: [],
+                byLevel: [],
+                bySegment: [],
+            };
+
+            for (i = 0; i < levels+1; i++) {
+                r = (radius/levels) * (i + 1);
+                points.byLevel[i] = []
+                for (j = 0; j < segments; j++) {
+                    if (points.bySegment[j] == undefined) {
+                        points.bySegment[j] = [];
+                    }
+                    var randomnumber=Math.floor(Math.random()*25);
+                    theta = ((2 * Math.PI) / segments) * j;
+                    point = {
+                        r: r,
+                        theta: theta,
+                        x: r * Math.cos(theta),
+                        y: r * Math.sin(theta),
+                        level: i
+                    };
+                    point2 = {
+                        r: r*randomnumber,
+                        theta: theta,
+                        x: (r +randomnumber)* Math.cos(theta),
+                        y: (r +randomnumber)* Math.sin(theta),
+                        level: i
+                    };
+                    points.all.push(point);
+                    points.byLevel[i].push(point2)  ;
+                    points.bySegment[j].push(point);
+                }
+            }
+            return points;
+        };
+       
+       
+        var segments = 16,
+        levels = 3,
+        points = getPoints(chart.width / 3.5, segments, levels);
+        this.web.attr("transform", "translate(" + chart.center.x  + ", " +chart.center.y  + ")");
+
+        //kolka
+        this.web.selectAll("circle")
+        .data(points.all)
+        .enter().append("circle")
+        .attr("cx", function(d) {
+            return d.x;
+        })
+      .attr("cy", function(d) {
+          return d.y;
+      })
+      .attr("r", 0)
+      .attr("class", function(d) {
+          return "level-" + d.level;
+      });
+  
+  
+        //dookola  
+        for (level = 0; level < levels; level++) {
+            for (j = 0; j < segments; j++) {
+                var point = points.byLevel[level][j]
+                var nextIdx = j + 1 < segments ? j + 1 : 0;
+                var nextPoint = points.byLevel[level][nextIdx];
+                var nextPoint1Control = { x: 0, y: 0 }, nextPoint2Control = { x: 0, y: 0 };
+                var getRandomArbitary= function(min, max) {
+                    return Math.random() * (max - min) + min;
+                }
+                
+                nextPoint1Control.x = point.x * getRandomArbitary(0.85, 0.97);
+                nextPoint1Control.y = point.y * getRandomArbitary(0.85, 0.97);
+                nextPoint2Control.x = nextPoint.x * getRandomArbitary(0.85, 0.97);
+                nextPoint2Control.y = nextPoint.y * getRandomArbitary(0.85, 0.97);
+
+                this.web.append("path")
+                    .attr("d", " M " + point.x + "," + point.y + " C " + nextPoint1Control.x + "," + nextPoint1Control.y + " "
+                    + nextPoint2Control.x + "," + nextPoint2Control.y + " " + nextPoint.x + "," + nextPoint.y)
+                    .attr("fill","none")
+                //.attr("d", "M " + point.x + " " + point.y + " L " + nextPoint.x + " " + nextPoint.y)
+                .style("stroke", "#055");
+            }
+        }
+  
+        //wysokosc
+        for (segment = 0; segment < segments; segment++) {
+            console.debug(points.bySegment[segment]);
+            var start = points.bySegment[segment][0];
+            var end = points.bySegment[segment][levels];
+            this.web.append("path")
+             
+            .attr("d", "M" + start.x + " " + start.y + " L " + end.x + " " + end.y)
+            .style("stroke", "#000");
+        }
+ 
+
+        this.circles.enter().append("circle").attr("r", 0).attr("fill", function (d) {
+            return chart.fill_color(d.group);
+        })
+            .attr("stroke-width", 2).attr("stroke", function (d) {
+             return d3.rgb(chart.fill_color(d.group)).darker();
+         }).attr("id", function (d) {
+             return "bubble_" + d.id;
+         }).attr("cx", start.x)
+            .attr("cy", start.y)
+            .on("mouseover", function (d, i) {
+             return chart.show_details(d, i, this);
+         }).on("mouseout", function (d, i) {
+             return chart.hide_details(d, i, this);
+         }).on("click", function (d, i) {
+             if (!chart.inTransition)
+                 if (chart.zoomed == false) {
+                     chart.inTransition = true;
+                     chart.hide_details(d, i, this);
+                     return chart.zoom_circle(d);
+                 }
+                 else {
+                     chart.inTransition = true;
+                     return chart.unzoom_circle();
+                 }
+         });
         return this.circles.transition().duration(2000).attr("r", function (d) {
             return d.radius;
-        });
-    };
+        }
+    )};
+
+   
+
 
     WebChart.prototype.zoom_circle = function (d) {
         var chart = this;
