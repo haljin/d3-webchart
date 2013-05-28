@@ -241,7 +241,7 @@ WebChart = (function () {
             return b.value - a.value;
         });
         
-        chart.hide_loading_screen();
+        screen.hide_loading_screen();
         chart.create_vis();
         //chart.start();
         //return chart.display_group_all();
@@ -645,10 +645,9 @@ WebChart = (function () {
     };
 
     WebChart.prototype.undraw_pie_chart = function () {
-        var radius = chart.zoomed_radius;
         var arc = d3.svg.arc()
-		.outerRadius(radius)
-		.innerRadius(radius - 20);
+		.outerRadius(chart.zoomed_radius)
+		.innerRadius(chart.zoomed_radius - 40);
         var g = chart.vis.selectAll("#piechart");
 
         chart.vis.selectAll("#userAvatar").remove();
@@ -664,37 +663,6 @@ WebChart = (function () {
 		    };
 		})
 		.remove();
-    };
-
-    WebChart.prototype.charge = function (d) {
-        return -Math.pow(d.radius, 2.0) / 8;
-    };
-
-    WebChart.prototype.start = function () {
-        return this.force = d3.layout.force().nodes(this.nodes).size([this.width, this.height]);
-    };
-
-    WebChart.prototype.display_group_all = function () {
-        var chart = this;
-        chart.mode = 0;
-        this.force.gravity(this.layout_gravity).charge(this.charge).friction(0.9).on("tick", function (e) {
-            return chart.circles.each(chart.move_towards_center(e.alpha)).attr("cx", function (d) {
-                return d.x;
-            }).attr("cy", function (d) {
-                return d.y;
-            });
-        });
-        chart.vis.select("#button_text").text("Show scale").attr("x", this.center.x - 40);
-
-        return this.force.start();
-    };
-
-    WebChart.prototype.move_towards_center = function (alpha) {
-        var chart = this;
-        return function (d) {
-            d.x = d.x + (chart.center.x - d.x) * (chart.damper + 0.02) * alpha;
-            return d.y = d.y + (chart.center.y - d.y) * (chart.damper + 0.02) * alpha;
-        };
     };
 
     WebChart.prototype.show_details = function (data, i, element) {
@@ -732,71 +700,7 @@ WebChart = (function () {
         }
         return this.tooltip.hideTooltip();
     };
-
-
-    WebChart.prototype.show_loading_screen = function () {
-        var w = 460,
-		h = 200,
-		x = d3.scale.ordinal().domain(d3.range(3)).rangePoints([0, w], 2);
-        var previous = {};
-        var ascending = true;
-        var fields =
-		{ endAngle: 0.0, startAngle: 0.0 };
-
-        var arc = d3.svg.arc()
-		.innerRadius(50)
-		.outerRadius(90)
-		.startAngle(function (d) { return d.startAngle; })
-		.endAngle(function (d) { return d.endAngle; });
-
-        var load_screen = d3.select("#vis").append("svg").attr("width", "100%").attr("height", "100%").attr("id", "svg_load");
-        var svg = load_screen
-		.append("g")
-		.attr("transform", "translate(" + this.center.x + "," + this.center.y + ")");
-
-        setInterval(function () {
-            previous = { endAngle: fields.endAngle, startAngle: fields.startAngle };
-            if (fields.endAngle >= 2 * Math.PI) {
-                ascending = false;
-            }
-            if (fields.startAngle >= 2 * Math.PI) {
-                fields.startAngle = 0;
-                fields.endAngle = 0;
-                ascending = true;
-            }
-            else {
-                if (ascending)
-                    fields.endAngle += Math.PI / 10;
-                else
-                    fields.startAngle += Math.PI / 10;
-
-                var path = svg.selectAll("path")
-			.data([fields]);
-
-                path.enter().append("path")
-			.attr("id", "swizzle")
-                //.attr("transform", function(d, i) { return "translate(" + x(i) + ",0)"; })
-			.transition()
-			.attrTween("d", arcTween);
-
-                path.transition()
-			.attrTween("d", arcTween);
-            }
-        }, 150);
-
-        function arcTween(b) {
-            var i = d3.interpolate(previous, b);
-            this._current = i(0);
-            return function (t) {
-                return arc(i(t));
-            };
-        }
-    };
-
-    WebChart.prototype.hide_loading_screen = function () {
-        d3.select("#svg_load").remove();
-    };
-
+    
     WebChart.prototype.reset = function () {
         this.nodes = [];
         this.totalCyborgScore = 0;
@@ -859,8 +763,10 @@ $(function () {
     chart = null;
     var token = "32d74aa9-211e-4bbd-b99d-9af5aebb370d";// "32d74aa9-211e-4bbd-b99d-9af5aebb370d";
     var timeline = null;
-
+    
     chart = new WebChart(token);
-    return chart.show_loading_screen();
+    screen = new LoadingScreen(chart.center.x, chart.center.y);
+
+    return screen.show_loading_screen();
 });
 
