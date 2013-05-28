@@ -29,6 +29,9 @@ WebChart = (function () {
             sms: "00,00 25,00 25,15 00,15 00,00 13,7 25,00",
             bt: "00,07 05,10 05,00 12,05 05,10 12,15 05,20 05,10 00,13"
         };
+        this.segments = 16;
+        this.levels = 3;
+        this.points = null; 
 
         
 
@@ -268,105 +271,40 @@ WebChart = (function () {
         this.details = this.vis.append("g").attr("id", "Details");
         this.circles = this.web.selectAll("circle").data(this.nodes.slice(0,1), function (d) {
             return d.id;
-        });
-
+        });     
         
-      
-
-        //Draw circles
-
-        //this.circles.enter().append("circle").attr("r", 0).attr("fill", function (d) {
-        //    return chart.fill_color(d.group);
-        //}).attr("stroke-width", 2).attr("stroke", function (d) {
-        //    return d3.rgb(chart.fill_color(d.group)).darker();
-        //}).attr("id", function (d) {
-        //    return "bubble_" + d.id;
-        //}).on("mouseover", function (d, i) {
-        //    return chart.show_details(d, i, this);
-        //}).on("mouseout", function (d, i) {
-        //    return chart.hide_details(d, i, this);
-        //}).on("click", function (d, i) {
-        //    if (!chart.inTransition)
-        //        if (chart.zoomed == false) {
-        //            chart.inTransition = true;
-        //            chart.hide_details(d, i, this);
-        //            return chart.zoom_circle(d);
-        //        }
-        //        else {
-        //            chart.inTransition = true;
-        //            return chart.unzoom_circle();
-        //        }
-        //});
-
-        //return this.circles.transition().duration(2000).attr("r", function (d) {
-        //    return d.radius;
-        //});
-        var getPoints = function(radius, segments, levels) {
-            points = {
-                all: [],
-                byLevel: [],
-                bySegment: [],
-            };
-
-            for (i = 0; i < levels+1; i++) {
-                r = (radius/levels) * (i + 1);
-                points.byLevel[i] = []
-                for (j = 0; j < segments; j++) {
-                    if (points.bySegment[j] == undefined) {
-                        points.bySegment[j] = [];
-                    }
-                    var randomnumber=Math.floor(Math.random()*25);
-                    theta = ((2 * Math.PI) / segments) * j;
-                    point = {
-                        r: r,
-                        theta: theta,
-                        x: r * Math.cos(theta),
-                        y: r * Math.sin(theta),
-                        level: i
-                    };
-                    point2 = {
-                        r: r*randomnumber,
-                        theta: theta,
-                        x: (r +randomnumber)* Math.cos(theta),
-                        y: (r +randomnumber)* Math.sin(theta),
-                        level: i
-                    };
-                    points.all.push(point);
-                    points.byLevel[i].push(point2)  ;
-                    points.bySegment[j].push(point);
+        this.web.attr("transform", "translate(" + chart.center.x + ", " + chart.center.y + ")").on("click", function (d, i) {
+            if (!chart.inTransition)
+                if (chart.zoomed) {
+                    chart.inTransition = true;
+                    return chart.unzoom_circle();
                 }
-            }
-            return points;
-        };
-       
-       
-        var segments = 16,
-        levels = 3,
-        points = getPoints(chart.width / 3.5, segments, levels);
-        this.web.attr("transform", "translate(" + chart.center.x  + ", " +chart.center.y  + ")");
+        });
+            
 
-        //kolka
-        this.web.selectAll("circle")
-        .data(points.all)
-        .enter().append("circle")
-        .attr("cx", function(d) {
-            return d.x;
-        })
-      .attr("cy", function(d) {
-          return d.y;
-      })
-      .attr("r", 0)
-      .attr("class", function(d) {
-          return "level-" + d.level;
-      });
-  
+      //  //kolka
+      //  this.web.selectAll("circle")
+      //  .data(points.all)
+      //  .enter().append("circle")
+      //  .attr("cx", function(d) {
+      //      return d.x;
+      //  })
+      //.attr("cy", function(d) {
+      //    return d.y;
+      //})
+      //.attr("r", 0)
+      //.attr("class", function(d) {
+      //    return "level-" + d.level;
+      //});
+        this.points = this.getPoints(chart.width / 3.5, chart.segments, chart.levels);
+
   
         //dookola  
-        for (level = 0; level < levels; level++) {
-            for (j = 0; j < segments; j++) {
-                var point = points.byLevel[level][j]
-                var nextIdx = j + 1 < segments ? j + 1 : 0;
-                var nextPoint = points.byLevel[level][nextIdx];
+        for (level = 0; level < chart.levels; level++) {
+            for (j = 0; j < chart.segments; j++) {
+                var point = chart.points.byLevel[level][j]
+                var nextIdx = j + 1 < chart.segments ? j + 1 : 0;
+                var nextPoint = chart.points.byLevel[level][nextIdx];
                 var nextPoint1Control = { x: 0, y: 0 }, nextPoint2Control = { x: 0, y: 0 };
                 var getRandomArbitary= function(min, max) {
                     return Math.random() * (max - min) + min;
@@ -387,10 +325,10 @@ WebChart = (function () {
         }
   
         //wysokosc
-        for (segment = 0; segment < segments; segment++) {
-            console.debug(points.bySegment[segment]);
-            var start = points.bySegment[segment][0];
-            var end = points.bySegment[segment][levels];
+        for (segment = 0; segment < chart.segments; segment++) {
+            console.debug(chart.points.bySegment[segment]);
+            var start = chart.points.bySegment[segment][0];
+            var end = chart.points.bySegment[segment][chart.levels];
             this.web.append("path")
              
             .attr("d", "M" + start.x + " " + start.y + " L " + end.x + " " + end.y)
@@ -399,30 +337,32 @@ WebChart = (function () {
  
 
         this.circles.enter().append("circle").attr("r", 0).attr("fill", function (d) {
-            return chart.fill_color(d.group);
+
+            return chart.colors[d.group];
         })
             .attr("stroke-width", 2).attr("stroke", function (d) {
-             return d3.rgb(chart.fill_color(d.group)).darker();
-         }).attr("id", function (d) {
-             return "bubble_" + d.id;
-         }).attr("cx", start.x)
-            .attr("cy", start.y)
+                return d3.rgb(chart.colors[d.group]).darker();
+            }).attr("id", function (d) {
+                return "bubble_" + d.id;
+            }).attr("cx", function (d) {
+                d.x = start.x;
+                return start.x;
+            })
+            .attr("cy", function (d) {
+                d.y = start.y;
+                return start.y;
+            })
             .on("mouseover", function (d, i) {
-             return chart.show_details(d, i, this);
-         }).on("mouseout", function (d, i) {
-             return chart.hide_details(d, i, this);
-         }).on("click", function (d, i) {
-             if (!chart.inTransition)
-                 if (chart.zoomed == false) {
-                     chart.inTransition = true;
-                     chart.hide_details(d, i, this);
-                     return chart.zoom_circle(d);
-                 }
-                 else {
-                     chart.inTransition = true;
-                     return chart.unzoom_circle();
-                 }
-         });
+                return chart.show_details(d, i, this);
+            }).on("mouseout", function (d, i) {
+                return chart.hide_details(d, i, this);
+            }).on("click", function (d, i) {
+                if (!chart.inTransition && !chart.zoomed) {
+                    chart.inTransition = true;
+                    chart.hide_details(d, i, this);                    
+                    return chart.zoom_circle(d);
+                }
+            });
         return this.circles.transition().duration(2000).attr("r", function (d) {
             return d.radius;
         }
@@ -444,7 +384,7 @@ WebChart = (function () {
 
 
         //Darken other circles
-        other_circles.transition().duration(2000)
+        other_circles.transition().duration(1000)
             .attr("fill", function (d) {
                 return d3.rgb(chart.colors[d.group]).darker().darker().darker();
             })
@@ -454,9 +394,9 @@ WebChart = (function () {
             });
 
         //Zoom out the rest of the visualization
-        this.web.transition().duration(2000)
+        this.web.transition().duration(1000)
         .attr("transform", function (d) {
-            return "scale(0.15)";
+            return "translate(50,50) scale(0.15)";
         });
 
         //Create new zoomed circle
@@ -466,11 +406,13 @@ WebChart = (function () {
 		.attr("fill", chart.colors[d.group])
 		.attr("stroke-width", 2)
 		.attr("stroke", d3.rgb(chart.colors[d.group]).darker())
+        .attr("transform", "translate(" + chart.center.x  + ", " +chart.center.y  + ")")
 		.transition()
 		.ease("elastic")
+        .attr("transform", "translate(0,0)")
 		.attr("cx", this.zoomed_loc.x)
 		.attr("cy", this.zoomed_loc.y)
-		.duration(2000)
+		.duration(1000)
 		.attr("r", chart.zoomed_radius)
 		.each('end', function () {
 		    if (chart.zoomed)
@@ -484,23 +426,25 @@ WebChart = (function () {
         var other_circles = this.circles;
         var new_circle = this.vis.selectAll("#circle-zoomed");
         //Lighten other circles
-        other_circles.transition().duration(2000).attr("fill", function (d) {
+        other_circles.transition().duration(1000).attr("fill", function (d) {
             return d3.rgb(chart.colors[d.group]);
         }).attr("stroke-width", 2).attr("stroke", function (d) {
             return d3.rgb(chart.colors[d.group]).darker();
         });
-        this.web.transition().duration(2000)
+
+        this.web.transition().duration(1000)
         .attr("transform", function (d) {
-            return "scale(1)";
+            return "translate(" + chart.center.x  + ", " + chart.center.y  + ") scale(1)";
         });
         //Destroy the pie chart, unzoom the circle
         chart.undraw_pie_chart().each('end', function () {
             new_circle
 			.transition()
+            .attr("transform", "translate(" + chart.center.x + ", " + chart.center.y + ")")
 			.attr("cx", chart.clicked.x)
 			.attr("cy", chart.clicked.y)
 			.attr("r", 0)
-			.duration(2000)
+			.duration(1000)
 			.each('start', function () {
 			    chart.vis.selectAll("#pie").remove();
 			    chart.vis.selectAll("#button-unzoom").remove();
@@ -554,7 +498,7 @@ WebChart = (function () {
                 return d3.rgb(chart.colors[toLabel[i]]).darker();
             })
             .style("stroke-width", "2px")
-            .transition().duration(1000).attrTween("d", function (data) {
+            .transition().duration(500).attrTween("d", function (data) {
                 var interpolation = d3.interpolate({ startAngle: 0, endAngle: 0 }, data);
                 this._current = interpolation(0);
                 return function (t) {
@@ -710,7 +654,7 @@ WebChart = (function () {
         chart.vis.selectAll("#userAvatar").remove();
         chart.vis.selectAll("#userName").remove();
         return g.transition()
-		.duration(1000)
+		.duration(500)
 		.attrTween("d", function (data) {
 		    data.startAngle = data.endAngle = (2 * Math.PI);
 		    var interpolation = d3.interpolate(this._current, data);
@@ -863,6 +807,45 @@ WebChart = (function () {
         this.inTransition = false;
     };
 
+    //Auxiliary functions
+    WebChart.prototype.getPoints = function (radius, segments, levels) {
+        points = {
+            all: [],
+            byLevel: [],
+            bySegment: [],
+        };
+
+        for (i = 0; i < levels + 1; i++) {
+            r = (radius / levels) * (i + 1);
+            points.byLevel[i] = []
+            for (j = 0; j < segments; j++) {
+                if (points.bySegment[j] == undefined) {
+                    points.bySegment[j] = [];
+                }
+                var randomnumber = Math.floor(Math.random() * 25);
+                theta = ((2 * Math.PI) / segments) * j;
+                point = {
+                    r: r,
+                    theta: theta,
+                    x: r * Math.cos(theta),
+                    y: r * Math.sin(theta),
+                    level: i
+                };
+                point2 = {
+                    r: r * randomnumber,
+                    theta: theta,
+                    x: (r + randomnumber) * Math.cos(theta),
+                    y: (r + randomnumber) * Math.sin(theta),
+                    level: i
+                };
+                points.all.push(point);
+                points.byLevel[i].push(point2);
+                points.bySegment[j].push(point);
+            }
+        }
+        return points;
+    };
+       
     return WebChart;
 
 
