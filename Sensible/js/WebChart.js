@@ -5,7 +5,7 @@ WebChart = (function () {
 
         //Layout fields
         this.width = 1200;
-        this.height = 800;
+        this.height = 900;
         this.center = {
             x: this.width / 2,
             y: this.height / 2
@@ -271,9 +271,10 @@ WebChart = (function () {
         this.details = this.vis.append("g").attr("id", "Details");
         this.circles = this.web.selectAll("circle").data(this.nodes.slice(0,1), function (d) {
             return d.id;
-        });     
-        
-        this.web.attr("transform", "translate(" + chart.center.x + ", " + chart.center.y + ")").on("click", function (d, i) {
+        });
+
+
+        this.web.attr("transform", "translate(" + chart.center.x + ", " + (chart.center.y-100) + ")").on("click", function (d, i) {
             if (!chart.inTransition)
                 if (chart.zoomed) {
                     chart.inTransition = true;
@@ -296,7 +297,7 @@ WebChart = (function () {
       //.attr("class", function(d) {
       //    return "level-" + d.level;
       //});
-        this.points = this.getPoints(chart.width / 3.5, chart.segments, chart.levels);
+        this.points = this.getPoints((chart.width-100) / 3.5, chart.segments, chart.levels);
 
   
         //dookola  
@@ -434,7 +435,7 @@ WebChart = (function () {
 
         this.web.transition().duration(1000)
         .attr("transform", function (d) {
-            return "translate(" + chart.center.x  + ", " + chart.center.y  + ") scale(1)";
+            return "translate(" + chart.center.x + ", " + (chart.center.y - 100 )+ ") scale(1)";
         });
         //Destroy the pie chart, unzoom the circle
         chart.undraw_pie_chart().each('end', function () {
@@ -458,6 +459,9 @@ WebChart = (function () {
 
     };
 
+
+
+    //end of calendar chart
     WebChart.prototype.draw_details = function (d) {
 
         this.draw_pie_chart(d);
@@ -762,8 +766,8 @@ root = typeof exports !== "undefined" && exports !== null ? exports : this;
 $(function () {
     chart = null;
     var token = "32d74aa9-211e-4bbd-b99d-9af5aebb370d";// "32d74aa9-211e-4bbd-b99d-9af5aebb370d";
-    var timeline = null;
-    
+
+    timeline = new Timeline(token);
     chart = new WebChart(token);
     screen = new LoadingScreen(chart.center.x, chart.center.y);
 
