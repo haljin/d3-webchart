@@ -55,3 +55,25 @@ footer {
    user-select: none;
    background: transparent;
 }
+
+
+.subunit.SWE { fill: #ccc; }
+.subunit.DNB { fill: #dcd; }
+.subunit.DNK-3416 { fill: #dcc; }
+.subunit.DNK-3417 { fill: #cdd; }
+.subunit.DNK-3418 { fill: #ccd; }
+.subunit.DNK-3419 { fill: #cdc; }
+.subunit.DNK-3420 { fill: #ddc; }
+
+.place-label {
+    font-family: 'Segoe UI';
+    
+}
+
+.subunit-label {
+  fill: #777;
+  fill-opacity: .5;
+  font-size: 20px;
+  font-weight: 300;
+  text-anchor: middle;
+}

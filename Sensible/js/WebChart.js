@@ -459,11 +459,13 @@ WebChart = (function () {
     };
 
     WebChart.prototype.draw_details = function (d) {
+        var map = new MapView();
 
+        this.details.append("g").attr("id", "map");
+
+
+        map.draw_map();
         this.draw_pie_chart(d);
-        
-
-
     };
 
     WebChart.prototype.draw_pie_chart = function (d) {
@@ -761,7 +763,7 @@ root = typeof exports !== "undefined" && exports !== null ? exports : this;
 
 $(function () {
     chart = null;
-    var token = "32d74aa9-211e-4bbd-b99d-9af5aebb370d";// "32d74aa9-211e-4bbd-b99d-9af5aebb370d";
+    var token = "deca86ae4bac4d8caff4dec795f4d837";
     var timeline = null;
     
     chart = new WebChart(token);
