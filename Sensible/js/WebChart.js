@@ -463,11 +463,13 @@ WebChart = (function () {
 
     //end of calendar chart
     WebChart.prototype.draw_details = function (d) {
+        var map = new MapView();
 
+        this.details.append("g").attr("id", "map");
+
+
+        map.draw_map();
         this.draw_pie_chart(d);
-        
-
-
     };
 
     WebChart.prototype.draw_pie_chart = function (d) {
@@ -764,10 +766,14 @@ var parseResponse = function (data) { return data; };
 root = typeof exports !== "undefined" && exports !== null ? exports : this;
 
 $(function () {
-    chart = null;
+    chart = null; 
+    var token = "deca86ae4bac4d8caff4dec795f4d837";
+
     var token = "32d74aa9-211e-4bbd-b99d-9af5aebb370d";// "32d74aa9-211e-4bbd-b99d-9af5aebb370d";
 
     timeline = new Timeline(token);
+
+
     chart = new WebChart(token);
     screen = new LoadingScreen(chart.center.x, chart.center.y);
 
