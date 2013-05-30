@@ -5,7 +5,7 @@ WebChart = (function () {
 
         //Layout fields
         this.width = 1200;
-        this.height = 800;
+        this.height = 750;
         this.center = {
             x: this.width / 2,
             y: this.height / 2
@@ -270,9 +270,10 @@ WebChart = (function () {
         this.details = this.vis.append("g").attr("id", "Details");
         this.circles = this.web.selectAll("circle").data(this.nodes.slice(0,1), function (d) {
             return d.id;
-        });     
-        
-        this.web.attr("transform", "translate(" + chart.center.x + ", " + chart.center.y + ")").on("click", function (d, i) {
+        });
+
+
+        this.web.attr("transform", "translate(" + chart.center.x + ", " + (chart.center.y) + ")").on("click", function (d, i) {
             if (!chart.inTransition)
                 if (chart.zoomed) {
                     chart.inTransition = true;
@@ -295,7 +296,7 @@ WebChart = (function () {
       //.attr("class", function(d) {
       //    return "level-" + d.level;
       //});
-        this.points = this.getPoints(chart.width / 3.5, chart.segments, chart.levels);
+        this.points = this.getPoints((chart.width-100) / 3.5, chart.segments, chart.levels);
 
   
         //dookola  
@@ -362,6 +363,7 @@ WebChart = (function () {
                     return chart.zoom_circle(d);
                 }
             });
+
         return this.circles.transition().duration(2000).attr("r", function (d) {
             return d.radius;
         }
@@ -436,7 +438,7 @@ WebChart = (function () {
 
         this.web.transition().duration(1000)
         .attr("transform", function (d) {
-            return "translate(" + chart.center.x  + ", " + chart.center.y  + ") scale(1)";
+            return "translate(" + chart.center.x + ", " + (chart.center.y )+ ") scale(1)";
         });
         //Destroy the pie chart, unzoom the circle
         chart.undraw_pie_chart().each('end', function () {
@@ -457,9 +459,12 @@ WebChart = (function () {
 			    chart.inTransition = false;
 			});
         });
-
+        
     };
 
+
+
+  
     WebChart.prototype.draw_details = function (d) {
         map = new MapView();
 
@@ -764,10 +769,13 @@ var parseResponse = function (data) { return data; };
 root = typeof exports !== "undefined" && exports !== null ? exports : this;
 
 $(function () {
-    chart = null;
+    chart = null; 
     var token = "deca86ae4bac4d8caff4dec795f4d837";
-    var timeline = null;
-    
+
+   
+    timeline = new Timeline(token);
+
+
     chart = new WebChart(token);
     screen = new LoadingScreen(chart.center.x, chart.center.y);
 
