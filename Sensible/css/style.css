@@ -95,3 +95,11 @@ footer {
   text-anchor: middle;
 
 }
+#timeline {
+    margin: 0 auto;
+    clear: both;
+}
+
+#vis {
+    margin: 0 auto;   
+}
