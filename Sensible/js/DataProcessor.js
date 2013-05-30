@@ -5,9 +5,13 @@ DataProcessor = (function () {
 
     };
 
+    DataProcessor.prototype.parse_loc_date = function (data) {
+
+
+    };
 
     DataProcessor.prototype.generate_loc_data = function (btData, smsData, callData, locData) {
-        var results = [];
+        var results = { data: [] };
 
         callData.forEach(function (d) {
             var diff = locData[0].timestamp;
@@ -16,13 +20,13 @@ DataProcessor = (function () {
             for (var i = 0; i < locData.length; i++) {
                 if (Math.abs(locData[i].timestamp - d.timestamp) <= diff) {
                     diff = Math.abs(locData[i].timestamp - d.timestamp);
-                    closest = x;
+                    closest = locData[i];
                 }
                 else
                     break;
             };
 
-            results.push({ lon: closest.location.longtitude, lat: closest.location.latitude, type: "call" });
+            results.data.push({ lon: closest.location.longitude, lat: closest.location.latitude, type: "call" });
         });
 
         smsData.forEach(function (d) {
@@ -32,15 +36,15 @@ DataProcessor = (function () {
             for (var i = 0; i < locData.length; i++) {
                 if (Math.abs(locData[i].timestamp - d.timestamp) <= diff) {
                     diff = Math.abs(locData[i].timestamp - d.timestamp);
-                    closest = x;
+                    closest = locData[i];
                 }
                 else
                     break;
             };
 
-            results.push({ lon: closest.location.longtitude, lat: closest.location.latitude, type: "sms" });
+            results.data.push({ lon: closest.location.longitude, lat: closest.location.latitude, type: "sms" });
         });
-
+       
         btData.forEach(function (d) {
             var diff = locData[0].timestamp;
             var closest = null;
@@ -48,18 +52,16 @@ DataProcessor = (function () {
             for (var i = 0; i < locData.length; i++) {
                 if (Math.abs(locData[i].timestamp - d.timestamp) <= diff) {
                     diff = Math.abs(locData[i].timestamp - d.timestamp);
-                    closest = x;
+                    closest = locData[i];
                 }
                 else
                     break;
             };
 
-            results.push({ lon: closest.location.longtitude, lat: closest.location.latitude, type: "bt" });
+            results.data.push({ lon: closest.location.longitude, lat: closest.location.latitude, type: "bt" });
         });
 
-
-
-
+        return results;
     };
 
     return DataProcessor;
