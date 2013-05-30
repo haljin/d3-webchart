@@ -5,7 +5,7 @@ WebChart = (function () {
 
         //Layout fields
         this.width = 1200;
-        this.height = 900;
+        this.height = 750;
         this.center = {
             x: this.width / 2,
             y: this.height / 2
@@ -274,7 +274,7 @@ WebChart = (function () {
         });
 
 
-        this.web.attr("transform", "translate(" + chart.center.x + ", " + (chart.center.y-100) + ")").on("click", function (d, i) {
+        this.web.attr("transform", "translate(" + chart.center.x + ", " + (chart.center.y) + ")").on("click", function (d, i) {
             if (!chart.inTransition)
                 if (chart.zoomed) {
                     chart.inTransition = true;
@@ -364,6 +364,7 @@ WebChart = (function () {
                     return chart.zoom_circle(d);
                 }
             });
+
         return this.circles.transition().duration(2000).attr("r", function (d) {
             return d.radius;
         }
@@ -435,7 +436,7 @@ WebChart = (function () {
 
         this.web.transition().duration(1000)
         .attr("transform", function (d) {
-            return "translate(" + chart.center.x + ", " + (chart.center.y - 100 )+ ") scale(1)";
+            return "translate(" + chart.center.x + ", " + (chart.center.y )+ ") scale(1)";
         });
         //Destroy the pie chart, unzoom the circle
         chart.undraw_pie_chart().each('end', function () {
@@ -456,12 +457,12 @@ WebChart = (function () {
 			    chart.inTransition = false;
 			});
         });
-
+        
     };
 
 
 
-    //end of calendar chart
+  
     WebChart.prototype.draw_details = function (d) {
         var map = new MapView();
 
@@ -769,8 +770,7 @@ $(function () {
     chart = null; 
     var token = "deca86ae4bac4d8caff4dec795f4d837";
 
-    var token = "32d74aa9-211e-4bbd-b99d-9af5aebb370d";// "32d74aa9-211e-4bbd-b99d-9af5aebb370d";
-
+   
     timeline = new Timeline(token);
 
 
