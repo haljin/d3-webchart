@@ -26,7 +26,7 @@ MapView = (function () {
     MapView.prototype.draw_map = function(token){
         vis = d3.select("#map").attr("clip-path", "url(#clipMap)"); 
         var map = this;
-        d3.select(vis.node().parentNode).append("clipPath").attr("id", "clipMap").append("rect").attr("x", 100).attr("y", 400).attr("width", 400).attr("height", 400);
+        d3.select(vis.node().parentNode).append("clipPath").attr("id", "clipMap").append("rect").attr("x", 0).attr("y", 400).attr("width", 400).attr("height", 400);
 
         g = vis.append("g").attr("id", "mapDisplay");
         gsh = g.append("g").attr("id", "mapShapes");
@@ -34,17 +34,18 @@ MapView = (function () {
 
         
        
+
         setTimeout(function () {
             d3.json("data/loc_contact/" + token, function (err, data) {
                 map.draw_points(data)
             });
-        }, 1000);
+        }, 2500);
 
         d3.json("data/dk.json", function (error, dk) {
 
             map.subunits = [].concat(topojson.feature(dk, dk.objects.subunits).features, topojson.feature(dk, dk.objects.prov).features);
-
             gsh.append("rect").attr("x", -10000).attr("y", -10000).attr("width", 20000).attr("height", 20000).style("fill", "#ffffff");
+
             
             gsh.selectAll(".subunit")
                .data(map.subunits)
@@ -84,7 +85,14 @@ MapView = (function () {
                 .attr("dy", ".35em")
                 .text(function (d) { return d.properties.name; });
 
-
+            g.append("text")
+                .attr("id", "maploading")
+                .attr("x", 200)
+                .attr("y", 600)
+                .style("font-family", "Segoe UI")
+                .style("font-variant", "small-caps")
+                .style("font-size", "24px")
+                .text("Loading...");
           
         });
 
@@ -116,6 +124,7 @@ MapView = (function () {
         var colorScale = d3.scale.linear().range([0.5, 0.9]).domain(range);
         var sizeScale = d3.scale.linear().range([6,9]).domain(range);
 
+        d3.select("#maploading").remove();
         gleg.selectAll("circle").data(this.points).enter().append("circle")
             .attr("r", function (d) {
                 return sizeScale(d.count);
