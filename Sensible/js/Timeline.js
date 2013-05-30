@@ -68,9 +68,9 @@ Timeline = (function () {
             .attr("width", x({ x: .9 }))
             .attr("height", 0)
           .transition()
-            .delay(function (d, i) { return i * 10; })
+            .delay(function (d, i) { return i * 5; })
             .attr("y", y1)
-            .attr("height", function (d) { return y0(d) - y1(d); });
+            .attr("height", function (d) { return y0(d) - y1(d); });     
 
 
 

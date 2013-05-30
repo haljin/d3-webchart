@@ -12,7 +12,15 @@ function addCommas(nStr)
 }
 
 
-
+Array.prototype.randomize = function () {
+    var i = this.length, j, temp;
+    while (--i) {
+        j = Math.floor(Math.random() * (i - 1));
+        temp = this[i];
+        this[i] = this[j];
+        this[j] = temp;
+    }
+}
 
 
 
