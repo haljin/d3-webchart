@@ -242,9 +242,7 @@ WebChart = (function () {
         });
         
         screen.hide_loading_screen();
-        chart.create_vis();
-        //chart.start();
-        //return chart.display_group_all();
+        return chart.create_vis();
     };
 
     WebChart.prototype.create_vis = function () {
