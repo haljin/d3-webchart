@@ -95,6 +95,10 @@ MapView = (function () {
         vis.call(zoom)
     };
 
+    MapView.prototype.undraw_map = function () {
+        return d3.select("#map").remove();
+    }
+
 
     return MapView;
 
