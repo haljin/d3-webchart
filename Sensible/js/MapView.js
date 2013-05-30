@@ -2,12 +2,16 @@
 
 
 MapView = (function () {
-    function MapView() {
+    function MapView(subject) {
 
         this.vis = null;
         this.g = null;
         this.gleg = null;
         this.gsh = null;
+        this.points = null;
+        this.accuracy = 0.02;
+        this.subject = subject;
+        this.colors = { call: "#b1f413", sms: "#ffd314", bt: "#7f1ac3" };
 
         this.projection = d3.geo.albers()
                 .center([0, 55.4])
@@ -30,13 +34,17 @@ MapView = (function () {
 
         
        
-        d3.json("data/loc_contact/" + token, map.draw_points);       
+        setTimeout(function () {
+            d3.json("data/loc_contact/" + token, function (err, data) {
+                map.draw_points(data)
+            });
+        }, 1000);
 
         d3.json("data/dk.json", function (error, dk) {
 
             map.subunits = [].concat(topojson.feature(dk, dk.objects.subunits).features, topojson.feature(dk, dk.objects.prov).features);
 
-            gsh.append("rect").attr("x", 100).attr("y", 400).attr("width", 400).attr("height", 400).style("fill", "#ffffff");
+            gsh.append("rect").attr("x", -10000).attr("y", -10000).attr("width", 20000).attr("height", 20000).style("fill", "#ffffff");
             
             gsh.selectAll(".subunit")
                .data(map.subunits)
@@ -82,10 +90,9 @@ MapView = (function () {
 
         var zoom = d3.behavior.zoom()
            .on("zoom", function () {
-               //g.attr("transform", "translate(" +
-               //    d3.event.translate.join(",") + ")scale(" + d3.event.scale + ")");
-               map.projection.scale(35000)
-                       .translate([-8500 + d3.event.translate[0], 2000 + d3.event.translate[1]]);
+               g.attr("transform", "translate(" +
+                   d3.event.translate.join(",") + ")");
+               //map.projection.translate([-8500 + d3.event.translate[0], 2000 + d3.event.translate[1]]);
 
                g.selectAll("path")
                    .attr("d", map.path.projection(map.projection));
@@ -100,14 +107,31 @@ MapView = (function () {
         vis.call(zoom)
     };
 
-    MapView.prototype.draw_points = function (error, data) {
-        gleg.selectAll("circle").data(data.data).enter().append("circle").attr("r", 5)
+    MapView.prototype.draw_points = function (data) {
+        var dp = new DataProcessor();
+        var map = this;        
+        this.points = dp.parse_loc_data(data.data, this.accuracy, map.subject.name);
+        var range = [d3.min(this.points, function (d) { return d.count; }),
+            d3.max(this.points, function (d) { return d.count; })];
+        var colorScale = d3.scale.linear().range([0.5, 0.9]).domain(range);
+        var sizeScale = d3.scale.linear().range([6,9]).domain(range);
+
+        gleg.selectAll("circle").data(this.points).enter().append("circle")
+            .attr("r", function (d) {
+                return sizeScale(d.count);
+            })
             .attr("cx", function (d) {
                 return map.projection([d.lon, d.lat])[0];
             })
             .attr("cy", function (d) {
                 return map.projection([d.lon, d.lat])[1];
             })
+            .style("fill", function (d) {
+                return map.colors[d.type];
+            })
+            .style("opacity", function (d) {
+                return colorScale(d.count);
+            });
     };
 
     MapView.prototype.update_points =function () {
@@ -121,6 +145,7 @@ MapView = (function () {
     };
 
     MapView.prototype.undraw_map = function () {
+        d3.select("#clipMap").remove();
         return d3.select("#map").remove();
     };
 
