@@ -105,12 +105,6 @@ WebChart = (function () {
         var extractNumber = function (hash) {
             return hash.substring(17, hash.length - 2)
         }
-        d3.json(chart.baseUrl + "/location/" + chart.token, function (data) {
-            var dProc = new DataProcessor();
-
-            dProc.generate_loc_data(chart.btData, chart.smsData, chart.callData, data);
-        });
-
 
         var createNode = function (id, name, cScore, smsScore, bScore) {
             return {
@@ -472,7 +466,7 @@ WebChart = (function () {
         this.details.append("g").attr("id", "map");
 
 
-        map.draw_map();
+        map.draw_map(chart.token);
         this.draw_pie_chart(d);
     };
 
