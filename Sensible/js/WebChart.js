@@ -32,7 +32,7 @@ WebChart = (function () {
         this.segments = 16;
         this.levels = 3;
         this.points = null; 
-
+        this.map = null;
         
 
         //Data fields
@@ -105,6 +105,13 @@ WebChart = (function () {
         var extractNumber = function (hash) {
             return hash.substring(17, hash.length - 2)
         }
+        d3.json(chart.baseUrl + "/location/" + chart.token, function (data) {
+            var dProc = new DataProcessor();
+
+            dProc.generate_loc_data(chart.btData, chart.smsData, chart.callData, data);
+        });
+
+
         var createNode = function (id, name, cScore, smsScore, bScore) {
             return {
                 id: id,
@@ -423,6 +430,9 @@ WebChart = (function () {
         var chart = this;
         var other_circles = this.circles;
         var new_circle = this.vis.selectAll("#circle-zoomed");
+
+        map.undraw_map();
+
         //Lighten other circles
         other_circles.transition().duration(1000).attr("fill", function (d) {
             return d3.rgb(chart.colors[d.group]);
@@ -457,7 +467,7 @@ WebChart = (function () {
     };
 
     WebChart.prototype.draw_details = function (d) {
-        var map = new MapView();
+        map = new MapView();
 
         this.details.append("g").attr("id", "map");
 
