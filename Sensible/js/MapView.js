@@ -22,7 +22,7 @@ MapView = (function () {
     MapView.prototype.draw_map = function(token){
         vis = d3.select("#map").attr("clip-path", "url(#clipMap)"); 
         var map = this;
-        d3.select(vis.node().parentNode).append("clipPath").attr("id", "clipMap").append("rect").attr("x", 100).attr("y", 400).attr("width", 400).attr("height", 400);
+        d3.select(vis.node().parentNode).append("clipPath").attr("id", "clipMap").append("rect").attr("x", 0).attr("y", 400).attr("width", 400).attr("height", 400);
 
         g = vis.append("g").attr("id", "mapDisplay");
         gsh = g.append("g").attr("id", "mapShapes");
@@ -30,13 +30,13 @@ MapView = (function () {
 
         
        
-        d3.json("data/loc_contact/" + token, map.draw_points);       
+        //d3.json("data/loc_contact/" + token, map.draw_points);       
 
         d3.json("data/dk.json", function (error, dk) {
 
             map.subunits = [].concat(topojson.feature(dk, dk.objects.subunits).features, topojson.feature(dk, dk.objects.prov).features);
 
-            gsh.append("rect").attr("x", 100).attr("y", 400).attr("width", 400).attr("height", 400).style("fill", "#ffffff");
+            gsh.append("rect").attr("x", 0).attr("y", 400).attr("width", 400).attr("height", 400).style("fill", "#ffffff");
             
             gsh.selectAll(".subunit")
                .data(map.subunits)

@@ -11,8 +11,8 @@ WebChart = (function () {
             y: this.height / 2
         };
         this.zoomed_loc = {
-            x: this.width / 6 + 20,
-            y: this.height / 4 + 20
+            x: this.width / 6 + 10,
+            y: this.height / 4 + 30
         };
 
         this.layout_gravity = -0.01;
@@ -259,9 +259,10 @@ WebChart = (function () {
             .attr("x", chart.center.x - 190)
             .attr("y", chart.center.y)
             .attr("size", 20)
-            .style("font-family", "Segoe UI")
+            .style("font-family", "\"Segoe UI\", \"Segoe UI Web Regular\",\"Segoe UI Symbol\",\"Helvetica Neue\",\"BBAlpha Sans\",\"S60 Sans\",Arial,\"sans-serif\"")
 		    .style("font-size", "30px")
 		    .style("font-variant", "small-caps")
+            .style("text-transform ", "uppercase")
             .text("No data for selected time period");
             return;
         }
@@ -282,20 +283,20 @@ WebChart = (function () {
         });
             
 
-      //  //kolka
-      //  this.web.selectAll("circle")
-      //  .data(points.all)
-      //  .enter().append("circle")
-      //  .attr("cx", function(d) {
-      //      return d.x;
-      //  })
-      //.attr("cy", function(d) {
-      //    return d.y;
-      //})
-      //.attr("r", 0)
-      //.attr("class", function(d) {
-      //    return "level-" + d.level;
-      //});
+        //  //kolka
+        //  this.web.selectAll("circle")
+        //  .data(points.all)
+        //  .enter().append("circle")
+        //  .attr("cx", function(d) {
+        //      return d.x;
+        //  })
+        //.attr("cy", function(d) {
+        //    return d.y;
+        //})
+        //.attr("r", 0)
+        //.attr("class", function(d) {
+        //    return "level-" + d.level;
+        //});
         this.points = this.getPoints((chart.width-100) / 3.5, chart.segments, chart.levels);
 
   
@@ -364,6 +365,16 @@ WebChart = (function () {
                 }
             });
 
+
+        chart.web.append("image")
+            .attr("id", "userAvatarMain")
+            .attr("xlink:href", "data/unknown-person.gif")
+            .attr("x", -60)
+            .attr("y", -100)
+            .attr("width", 120)
+            .attr("height", 200);
+
+
         return this.circles.transition().duration(2000).attr("r", function (d) {
             return d.radius;
         }
@@ -428,6 +439,7 @@ WebChart = (function () {
         var new_circle = this.vis.selectAll("#circle-zoomed");
 
         map.undraw_map();
+        chart.undraw_multichart();
 
         //Lighten other circles
         other_circles.transition().duration(1000).attr("fill", function (d) {
@@ -469,11 +481,206 @@ WebChart = (function () {
         map = new MapView();
 
         this.details.append("g").attr("id", "map");
-
+        
 
         map.draw_map(chart.token);
+        this.draw_multichart(d);
+        this.draw_barschart(d);
         this.draw_pie_chart(d);
     };
+    WebChart.prototype.draw_barschart = function (d) {
+        var chart = this;
+        var g = chart.details.append("g").attr("id", "barschart").attr("transform", "translate(595,500)");
+
+        d3.json(chart.baseUrl + "/collective/" + chart.token, function (error, data) {
+            var dProcessor = new DataProcessor();
+            var data = dProcessor.gen_timeline_data(data);
+
+            var width = 600,
+            height = 200;
+
+            var parseDate = d3.time.format("%Y%m%d").parse;
+            var width = 600,
+             height = 200;
+
+            var x0 = d3.scale.ordinal()
+                .rangeRoundBands([0, width], .1);
+
+            var x1 = d3.scale.ordinal();
+
+            var y = d3.scale.linear()
+                .range([height, 0]);
+
+            var color = d3.scale.ordinal()
+                .range(["#98abc5", "#8a89a6", "#7b6888", "#6b486b", "#a05d56", "#d0743c", "#ff8c00"]);
+
+            var xAxis = d3.svg.axis()
+                .scale(x0)
+                .orient("bottom");
+
+            var yAxis = d3.svg.axis()
+                .scale(y)
+                .orient("left")
+                .tickFormat(d3.format(".2s"));
+
+            
+
+          
+
+            x0.domain(data.map(function (d) { return d.date; }));
+            x1.domain(d).rangeRoundBands([0, x0.rangeBand()]);//buckets
+            y.domain([0, d3.max(data, function (d) { return d3.max(d, function (v) { return v.y; }); })]);
+               
+            g.append("g")
+            .attr("class", "x axis")
+                .attr("transform", "translate(0," + height + ")")
+                .call(xAxis);
+
+            g.append("g")
+            .attr("class", "y axis")
+                .call(yAxis)
+              .append("text")
+                .attr("transform", "rotate(-90)")
+                .attr("y", 6)
+                .attr("dy", ".71em")
+                .style("text-anchor", "end")
+                .text("Population");
+
+            var state = g.selectAll(".state")
+                .data(data)
+              .enter().append("g")
+                .attr("class", "g")
+                .attr("transform", function (d) { return "translate(" + x0(d.date) + ",0)"; });
+
+            state.selectAll("rect")
+                .data(function (d) { return d; })
+              .enter().append("rect")
+                .attr("width", x1.rangeBand())
+                .attr("x", function (d) { return x1(d.x); })
+                .attr("y", function (d) { return y(d.y); })
+                .attr("height", function (d) { return height - y(d.x); })
+                .style("fill", function (d) { return color(d.y); });
+
+            var legend = g.selectAll(".legend")
+                .data(d.slice().reverse())
+              .enter().append("g")
+                .attr("class", "legend")
+                .attr("transform", function (d, i) { return "translate(0," + i * 20 + ")"; });
+
+            legend.append("rect")
+                .attr("x", width - 18)
+                .attr("width", 18)
+                .attr("height", 18)
+                .style("fill", color);
+
+            legend.append("text")
+                .attr("x", width - 24)
+                .attr("y", 9)
+                .attr("dy", ".35em")
+                .style("text-anchor", "end")
+                .text(function (d) { return d; });
+
+        });
+
+       
+    };
+
+    WebChart.prototype.draw_multichart = function (d) {
+        var chart = this;
+        var g = chart.details.append("g").attr("id", "totalschart").attr("transform", "translate(595,100)");
+
+        d3.json(chart.baseUrl + "/collective/" + chart.token, function (error, data) {
+            var dProcessor = new DataProcessor();
+            var data = dProcessor.gen_timeline_data(data);
+
+            var width = 600,
+            height = 200;
+
+            var parseDate = d3.time.format("%Y%m%d").parse;
+
+            var x = d3.time.scale()
+                .range([0, width]).domain(d3.extent(data[0], function (d) { return d.date; }));
+
+            var y = d3.scale.linear()
+                .range([height, 0]).domain([
+                d3.min(data, function (c) { return d3.min(c, function (v) { return v.y; }); }),
+                d3.max(data, function (c) { return d3.max(c, function (v) { return v.y; }); })
+                ]);
+
+          
+            var color = d3.scale.category10();
+
+            var xAxis = d3.svg.axis()
+                .scale(x)
+                .orient("bottom");
+
+            var yAxis = d3.svg.axis()
+                .scale(y)
+                .orient("left");
+
+            var line = d3.svg.line()
+                .interpolate("basis")
+                .x(function (d) { return x(d.date); })
+                .y(function (d) { return y(d.y); });
+
+
+
+            g.append("g")
+                .attr("class", "x axis")
+                .attr("transform", "translate(0," + height + ")")
+                .call(xAxis);
+
+            g.append("g")
+                .attr("class", "y axis")
+                .call(yAxis)
+              .append("text")
+                .attr("transform", "rotate(-90)")
+                .attr("y", 6)
+                .attr("dy", ".71em")
+                .style("text-anchor", "end")
+                .text("Total count");
+            g.append("clipPath").attr("id", "clipChart").append("rect").attr("x", 0).attr("y", 0).attr("width", 0).attr("height", height)
+                .transition().duration(2000).attr("width",width);
+
+            var totalsPaths = g.append("g").attr("id", "totalsPaths").selectAll(".contact")
+                .data(data)
+              .enter().append("g")
+                .attr("class", "contact").attr("clip-path", "url(#clipChart)");
+
+            totalsPaths.append("path")
+                .attr("class", "line")
+                .attr("d", function (d) {
+                    return line(d);
+                })
+                .style("stroke", function (d, i) {
+
+                    if (i == 0)
+                        return "#7f1ac3";
+                    if (i == 1)
+                        return "#b1f413";
+                    if (i == 2)
+                        return "#ffd314";
+                })
+            .style("fill", "none");
+
+
+            //city.append("text")
+            //    .datum(function (d) { return { name: d.name, value: d.values[d.values.length - 1] }; })
+            //    .attr("transform", function (d) { return "translate(" + x(d.value.date) + "," + y(d.value.temperature) + ")"; })
+            //    .attr("x", 3)
+            //    .attr("dy", ".35em")
+            //    .text(function (d) { return d.name; });
+
+
+        });
+
+
+    };
+
+    WebChart.prototype.undraw_multichart= function () {
+        return d3.select("#totalschart").remove();
+    };
+
 
     WebChart.prototype.draw_pie_chart = function (d) {
         var chart = this;
@@ -522,7 +729,8 @@ WebChart = (function () {
         //Draw the symbols
         g.append("polyline")
             .attr("transform", function (d) {
-                return "translate(" + Math.cos(((d.startAngle + d.endAngle - Math.PI) / 2)) * (chart.zoomed_radius + 30) + "," + Math.sin((d.startAngle + d.endAngle - Math.PI) / 2) * (chart.zoomed_radius + 30) + ")";
+                return "translate(" + Math.cos(((d.startAngle + d.endAngle - Math.PI) / 2)) * (chart.zoomed_radius + 30) +
+                    "," + Math.sin((d.startAngle + d.endAngle - Math.PI) / 2) * (chart.zoomed_radius + 30) + ")";
             })
             .attr("stroke", function (d, i) {
                 return chart.colors[toLabel[i]];
@@ -549,7 +757,7 @@ WebChart = (function () {
         chart.details.append("text")
             .attr("x", 400)
             .attr("id", "userName")
-            .attr("y", 130)
+            .attr("y", 60)
             .style("font-family", "Segoe UI")
             .style("font-variant", "small-caps")
             .text(function () { return chart.clicked.name; })
@@ -567,7 +775,7 @@ WebChart = (function () {
                     d3.select(this).transition()
                         .duration(150).attr("transform", "scale(1.2,1.2)");
                     chart.details.selectAll(".symbol").transition().duration(150).attr("transform", function (d) {
-                        return "translate(" + Math.cos(((d.startAngle + d.endAngle - Math.PI) / 2)) * (chart.zoomed_radius + 45) + "," + Math.sin((d.startAngle + d.endAngle - Math.PI) / 2) * (chart.zoomed_radius + 45) + ")";
+                        return "translate(" + Math.cos(((d.startAngle + d.endAngle - Math.PI) / 2)) * (chart.zoomed_radius + 50) + "," + Math.sin((d.startAngle + d.endAngle - Math.PI) / 2) * (chart.zoomed_radius + 45) + ")";
                     });
 
                     chart.details.append("text")
