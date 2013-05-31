@@ -6,13 +6,41 @@ DataProcessor = (function () {
 
     };
 
-    DataProcessor.prototype.parse_totals_data = function (cdata, sdata, bdata) {
+    DataProcessor.parse_totals_data = function (cdata, sdata, bdata) {
+        var maxes = [0, 0, 0];
+        var binData = function (timestamp, type) {
+            var date = new Date(timestamp * 1000);
+            bins[type][date.getDay()].slots[DataProcessor.get_timeslot(timestamp)].count += 1;
+            if (bins[type][date.getDay()].slots[DataProcessor.get_timeslot(timestamp)].count > maxes[type])
+                maxes[type] += 1;
+        };
+        var genTables = function () {
+            var gen = [];
+            for (var i = 0; i < 3; i++) {
+                gen.push([{ day: "Sun", slots: [] }, { day: "Mon", slots: [] },
+                    { day: "Tue", slots: [] }, { day: "Wed", slots: [] },
+                    { day: "Thu", slots: [] }, { day: "Fri", slots: [] },
+                    { day: "Sat", slots: [] }]);
+                for (var j = 0; j < 7; j++) {
+                    gen[i][j].slots = ([{ time: "00:00-08:00", count: 0 },
+                        { time: "08:00-12:00", count: 0 },
+                        { time: "12:00-13:00", count: 0 },
+                        { time: "13:00-17:00", count: 0 },
+                        { time: "17:00-00:00", count: 0 }
+                    ]);
+                }
+            }
+            return gen;
+        }
         var results = [[], [], []];
+        var bins = genTables();
+               
 
         cdata.forEach(function (d) {
             var found = false;
             var newDate = new Date(d.timestamp * 1000);
-            var lastElem = results[0][results[0].length-1];
+            var lastElem = results[0][results[0].length - 1];
+            binData(d.timestamp, 0);
             if (lastElem && lastElem.date.toLocaleDateString() == newDate.toLocaleDateString()) {
                 lastElem.count += 1;
             }
@@ -23,7 +51,8 @@ DataProcessor = (function () {
         sdata.forEach(function (d) {
             var found = false;
             var newDate = new Date(d.timestamp * 1000);
-            var lastElem = results[1][results[1].length-1];
+            var lastElem = results[1][results[1].length - 1];
+            binData(d.timestamp, 1);
             if (lastElem && lastElem.date.toLocaleDateString() == newDate.toLocaleDateString()) {
                 lastElem.count += 1;
             }
@@ -35,6 +64,7 @@ DataProcessor = (function () {
             var found = false;
             var newDate = new Date(d.timestamp * 1000);
             var lastElem = results[2][results[2].length - 1];
+            binData(d.timestamp, 2);
             if (lastElem && lastElem.date.toLocaleDateString() == newDate.toLocaleDateString()) {
                 lastElem.count += 1;
             }
@@ -42,11 +72,19 @@ DataProcessor = (function () {
                 results[2].push({ date: newDate, count: 1 });
         });
 
-        return results;
+        for (var i = 0; i < 3; i++) {
+            bins[i].forEach(function (day) {
+                day.slots.forEach(function (slot) {
+                    if(maxes[i] != 0) slot.count /= maxes[i];
+                });
+            });
+        }
+
+        return { totals: results, bins: bins};
 
     };
 
-    DataProcessor.prototype.parse_timeline_data = function (data) {
+    DataProcessor.parse_timeline_data = function (data) {
 
         var result = [[], [], []];
 
@@ -62,7 +100,7 @@ DataProcessor = (function () {
     };
 
 
-    DataProcessor.prototype.parse_loc_data = function (data, accuracy, realName) {
+    DataProcessor.parse_loc_data = function (data, accuracy, realName) {
         var result = [];
         var extractNumber = function (hash) {
             return hash.substring(17, hash.length - 2)
@@ -116,7 +154,28 @@ DataProcessor = (function () {
         return result;
     };
 
-    DataProcessor.prototype.gen_loc_data = function (btData, smsData, callData, locData) {
+
+
+    DataProcessor.get_timeslot = function (timestamp) {
+        var date = new Date(timestamp*1000);
+        if (date.getHours() < 8)
+            return DAYSLOT.MORNING;
+        else if (date.getHours() >= 8 && date.getHours() < 12)
+            return DAYSLOT.EARLYCLASS;
+        else if (date.getHours() >= 12 && date.getHours() < 13)
+            return DAYSLOT.LUNCH;
+        else if (date.getHours() >= 13 && date.getHours() < 17)
+            return DAYSLOT.LATECLASS;
+        else
+            return DAYSLOT.AFTER;
+    };
+
+
+
+
+
+
+    DataProcessor.gen_loc_data = function (btData, smsData, callData, locData) {
         var results = { data: [] };
         var extractNumber = function (hash) {
             return hash.substring(17, hash.length - 2)
@@ -182,7 +241,7 @@ DataProcessor = (function () {
 
 
 
-    DataProcessor.prototype.gen_collective_data = function (btData, smsData, callData) {
+    DataProcessor.gen_collective_data = function (btData, smsData, callData) {
         var result = [];
 
         btData.forEach(function (d) {
