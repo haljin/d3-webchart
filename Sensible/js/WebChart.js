@@ -415,10 +415,10 @@ WebChart = (function () {
             .attr("height", 200);
 
 
-        return this.circles.transition().duration(2000).attr("r", function (d) {
+        return this.circles.transition().duration(500).attr("r", function (d) {
             return d.radius;
         }).each("end", function () {
-            chart.circles.transition().duration(1000).attr("cx", function (d, i) {
+            chart.circles.transition().duration(500).attr("cx", function (d, i) {
                 d.x = points[i](d.friendshipScore).x
                 return points[i](d.friendshipScore).x;
             })
@@ -458,7 +458,7 @@ WebChart = (function () {
         //Zoom out the rest of the visualization
         this.web.transition().duration(1000)
         .attr("transform", function (d) {
-            return "translate(50,50) scale(0.15)";
+            return "translate(70,50) scale(0.15)";
         });
 
         //Create new zoomed circle
@@ -502,6 +502,9 @@ WebChart = (function () {
         .attr("transform", function (d) {
             return "translate(" + chart.center.x + ", " + (chart.center.y )+ ") scale(1)";
         });
+        chart.details.select("#numberOfConnectionsCall").remove();
+        chart.details.select("#numberOfConnectionsSms").remove();
+        chart.details.select("#numberOfConnectionsBt").remove();
         //Destroy the pie chart, unzoom the circle
         chart.undraw_pie_chart().each('end', function () {
             new_circle
@@ -638,6 +641,7 @@ WebChart = (function () {
         var chart = this;
         var g = chart.details.append("g").attr("id", "totalschart").attr("transform", "translate(595,100)");
         var toLabel = ["call", "sms", "bt"];
+        
 
             var data = d.totalsData; 
 
@@ -785,8 +789,8 @@ WebChart = (function () {
         chart.details.append("image")
             .attr("id", "userAvatar")
             .attr("xlink:href", "data/unknown-person.gif")
-            .attr("x", 170)
-            .attr("y", 120)
+            .attr("x", 160)
+            .attr("y", 130)
             .attr("width", 100)
             .attr("height", 180);
 
@@ -799,6 +803,57 @@ WebChart = (function () {
             .text(function () { return chart.clicked.name; })
             .style("font-size", text_scale(chart.clicked.name.length));
 
+
+
+        chart.details.append("text")
+                       .attr("x", 410)
+                       .attr("id", "numberOfConnectionsCall")
+                       .attr("y", 200)
+                       .style("font-family", "Segoe UI")
+                       .style("font-size", "15px")
+                       .style("font-variant", "small-caps")
+                       .text(function () {
+                           var content = "";
+                           var rest;
+                           var hours = Math.floor(chart.clicked.callStat / 3600);
+                           rest = chart.clicked.callStat % 3600;
+                           var minutes = Math.floor(rest / 60);
+                           rest = rest % 60;
+                           content += hours;
+                           if (minutes < 10)
+                               content += ":0" + minutes;
+                           else
+                               content += ":" + minutes;
+                           if (rest < 10)
+                               content += ":0" + rest + " time in call";
+                           else
+                               content += ":" + rest + " time in call";
+                           return content;
+                           chart.clicked.smsStat + " messages";
+                           chart.clicked.btStat + " connections";
+                       });
+
+                chart.details.append("text")
+                    .attr("x", 410)
+                    .attr("id", "numberOfConnectionsSms")
+                    .attr("y", 220)
+                    .style("font-family", "Segoe UI")
+                    .style("font-size", "15px")
+                    .style("font-variant", "small-caps")
+                    .text(function () {
+                        return chart.clicked.smsStat + " messages";   
+                    });
+
+                chart.details.append("text")
+                 .attr("x", 410)
+                 .attr("id", "numberOfConnectionsBt")
+                 .attr("y", 240)
+                 .style("font-family", "Segoe UI")
+                 .style("font-size", "15px")
+                 .style("font-variant", "small-caps")
+                 .text(function () {
+                     return chart.clicked.btStat + " connections";
+                 });
 
         paths
             .on("mouseover", function (d) {          
@@ -813,38 +868,15 @@ WebChart = (function () {
                     chart.details.selectAll(".symbol").transition().duration(150).attr("transform", function (d) {
                         return "translate(" + Math.cos(((d.startAngle + d.endAngle - Math.PI) / 2)) * (chart.zoomed_radius + 50) + "," + Math.sin((d.startAngle + d.endAngle - Math.PI) / 2) * (chart.zoomed_radius + 45) + ")";
                     });
+                    if (d.data.label == "Calls")
+                        chart.details.select("#numberOfConnectionsCall").style("font-weight", "bold");
+                    else if (d.data.label == "Sms")
+                        chart.details.select("#numberOfConnectionsSms").style("font-weight", "bold");
+                    else if (d.data.label == "Bluetooth")
+                        chart.details.select("#numberOfConnectionsBt").style("font-weight", "bold");
 
-                    chart.details.append("text")
-                        .attr("x", 170)
-                        .attr("id", "numberOfConnections")
-                        .attr("y", 420)
-                        .style("font-family", "Segoe UI")
-                        .style("font-size", "15px")
-                        .style("font-variant", "small-caps")
-                        .text(function () {
-                            if (d.data.label == "Calls") {
-                                var content = "";
-                                var rest;
-                                var hours = Math.floor(chart.clicked.callStat / 3600);
-                                rest = chart.clicked.callStat % 3600;
-                                var minutes = Math.floor(rest / 60);
-                                rest = rest % 60;
-                                content += hours;
-                                if (minutes < 10)
-                                    content += ":0" + minutes;
-                                else
-                                    content += ":" + minutes;
-                                if (rest < 10)
-                                    content += ":0" + rest + " time in call";
-                                else
-                                    content += ":" + rest + " time in call";
-                                return content;
-                            }
-                            else if (d.data.label == "Sms")
-                                return chart.clicked.smsStat + " messages";
-                            else if (d.data.label == "Bluetooth")
-                                return chart.clicked.btStat + " connections";
-                        });
+
+
                 }
             })
             .on("mouseout", function (d) {          
@@ -859,7 +891,14 @@ WebChart = (function () {
                     .attr("stroke-width", 1)
                     .attr("r", 5)
                     .style("font-weight", "normal");
-                    chart.vis.select("#numberOfConnections").remove();
+
+                    
+                    chart.details.select("#numberOfConnectionsCall").style("font-weight", "normal");
+                    
+                    chart.details.select("#numberOfConnectionsSms").style("font-weight", "normal");
+                    
+                    chart.details.select("#numberOfConnectionsBt").style("font-weight", "normal");
+                   
                 }
             });     
 
