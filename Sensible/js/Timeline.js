@@ -18,7 +18,7 @@ Timeline = (function () {
     Timeline.prototype.draw_calendar = function () {
         var chart = this;
         this.svg = d3.select("#timeline").append("svg").attr("width", "100%").attr("height", "100%").attr("id", "svg_timeline").style("display", "inline-block");
-
+        var toLabel = ["call", "sms", "bt"]
         var barPadding = 1;
         var dProcessor = new DataProcessor();
         var data = dProcessor.gen_timeline_data(chart.data);
@@ -47,13 +47,7 @@ Timeline = (function () {
             .data(data)
           .enter().append("svg:g")
             .style("fill", function (d,i) {
-
-                if (i==0)
-                    return "#7f1ac3";
-                if (i == 1)
-                    return "#b1f413";
-                if (i == 2)
-                    return "#ffd314";
+                return chart.colors[toLabel[i]];
             })
             .attr("class", "layer")
             .attr("transform", function (d) { return "translate(" + "0,27)"; });
@@ -83,9 +77,12 @@ Timeline = (function () {
             .x(xscale)
             .on("brush", brushed);
 
+        //var date = new Date(Date.now()), ending = new Date(Date.now());
+        //var starting = new Date(date.setMonth(date.getMonth() - 7))
 
+        //brush.extent([starting,ending]);
 
-        xscale.domain(d3.extent(data[0].map(function (d) { return d.date; })));
+        xscale.domain(/*[d3.min(data[0],function (d) { return d.date; }), ending]); */ d3.extent(data[0].map(function (d) { return d.date; })));
         yscale.domain([0, d3.max(data[0].map(function (d) { return d.y + d.y0; }))]);
 
 
