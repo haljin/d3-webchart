@@ -6,54 +6,61 @@ DataProcessor = (function () {
 
     };
 
+    DataProcessor.prototype.parse_totals_data = function (cdata, sdata, bdata) {
+        var results = [[], [], []];
 
- 
-  
-
-    DataProcessor.prototype.parse_collective_data = function (btData, smsData, callData) {
-        var result = [];
-
-        btData.forEach(function (d) {
-            d.devices.forEach(function (x) {
-                if (result.length != 0 &&
-                    (new Date(d.timestamp * 1000)).getDay() == result[result.length - 1].date.getDay()) {
-                    result[result.length - 1].btcount += 1;
-                }
-                else {
-                    result.push({ date: new Date(d.timestamp * 1000), btcount: 1, callcount: 0, smscount: 0 });
-                }
-            });
-        });
-        callData.forEach(function (d) {
-            var added = false;
-            result.forEach(function (e) {
-                if ((new Date(d.timestamp * 1000)).getDay() == e.date.getDay()) {
-                    e.callcount += 1;
-                    added = true;
-                }
-            });
-            if (added == false)
-                result.push({ date: new Date(d.timestamp * 1000), btcount: 0, callcount: 1, smscount: 0 });
-
-        });
-        smsData.forEach(function (d) {
-            var added = false;
-            result.forEach(function (e) {
-                if ((new Date(d.timestamp * 1000)).getDay() == e.date.getDay()) {
-                    e.smscount += 1;
-                    added = true;
-                }
-            });
-            if (added == false)
-                result.push({ date: new Date(d.timestamp * 1000), btcount: 0, callcount: 0, smscount: 1 });
-
+        cdata.forEach(function (d) {
+            var found = false;
+            var newDate = new Date(d.timestamp * 1000);
+            var lastElem = results[0][results[0].length-1];
+            if (lastElem && lastElem.date.toLocaleDateString() == newDate.toLocaleDateString()) {
+                lastElem.count += 1;
+            }
+            else
+                results[0].push({ date: newDate, count: 1 });
         });
 
-        result.sort(function (a, b) {
-            return a.date - b.date;
+        sdata.forEach(function (d) {
+            var found = false;
+            var newDate = new Date(d.timestamp * 1000);
+            var lastElem = results[1][results[1].length-1];
+            if (lastElem && lastElem.date.toLocaleDateString() == newDate.toLocaleDateString()) {
+                lastElem.count += 1;
+            }
+            else
+                results[1].push({ date: newDate, count: 1 });
         });
-        return window.open("data:text/json;charset=utf-8," + escape(JSON.stringify({ data: result }, null, 2)));
+
+        bdata.forEach(function (d) {
+            var found = false;
+            var newDate = new Date(d.timestamp * 1000);
+            var lastElem = results[2][results[2].length - 1];
+            if (lastElem && lastElem.date.toLocaleDateString() == newDate.toLocaleDateString()) {
+                lastElem.count += 1;
+            }
+            else
+                results[2].push({ date: newDate, count: 1 });
+        });
+
+        return results;
+
     };
+
+    DataProcessor.prototype.parse_timeline_data = function (data) {
+
+        var result = [[], [], []];
+
+
+        data.data.forEach(function (d, i) {
+            
+            result[0].push({ date: new Date(d.date), x: i, y: d.callcount, y0: 0 });
+            result[1].push({ date: new Date(d.date), x: i, y: d.smscount, y0: d.callcount });
+            result[2].push({ date: new Date(d.date), x: i, y: d.btcount, y0: d.callcount + d.smscount });
+        });
+
+        return result;
+    };
+
 
     DataProcessor.prototype.parse_loc_data = function (data, accuracy, realName) {
         var result = [];
@@ -109,70 +116,6 @@ DataProcessor = (function () {
         return result;
     };
 
-    DataProcessor.prototype.gen_totals_data = function (cdata, sdata, bdata) {
-        var results = [[], [], []];
-
-        cdata.forEach(function (d) {
-            var found = false;
-            var newDate = new Date (d * 1000);
-            results[0].forEach(function (x) {
-                if (x.date.toLocaleDateString() == newDate.toLocaleDateString()) {
-                    x.count += 1;
-                    found = true;
-                }
-            });
-            if (!found)
-                results[0].push({ date: newDate, count: 1 });
-
-        });
-
-        sdata.forEach(function (d) {
-            var found = false;
-            var newDate = new Date(d * 1000);
-            results[1].forEach(function (x) {
-                if (x.date.toLocaleDateString() == newDate.toLocaleDateString()) {
-                    x.count += 1;
-                    found = true;
-                }
-            });
-            if (!found)
-                results[1].push({ date: newDate, count: 1 });
-
-        });
-
-        bdata.forEach(function (d) {
-            var found = false;
-            var newDate = new Date(d * 1000);
-            results[2].forEach(function (x) {
-                if (x.date.toLocaleDateString() == newDate.toLocaleDateString()) {
-                    x.count += 1;
-                    found = true;
-                }
-            });
-            if (!found)
-                results[2].push({ date: newDate, count: 1 });
-
-        });
-
-        return results;
-
-    };
-
-    DataProcessor.prototype.gen_timeline_data = function (data) {
-
-        var result = [[], [], []];
-
-
-        data.data.forEach(function (d, i) {
-            
-            result[0].push({ date: new Date(d.date), x: i, y: d.callcount, y0: 0 });
-            result[1].push({ date: new Date(d.date), x: i, y: d.smscount, y0: d.callcount });
-            result[2].push({ date: new Date(d.date), x: i, y: d.btcount, y0: d.callcount + d.smscount });
-        });
-
-        return result;
-    };
-
     DataProcessor.prototype.gen_loc_data = function (btData, smsData, callData, locData) {
         var results = { data: [] };
         var extractNumber = function (hash) {
@@ -192,14 +135,14 @@ DataProcessor = (function () {
                 else
                     break;
             };
- 
-            results.data.push({ lon: closest.location.longitude, lat: closest.location.latitude, type: "call", contact: [d.call.number]});
+
+            results.data.push({ lon: closest.location.longitude, lat: closest.location.latitude, type: "call", contact: [d.call.number] });
         });
 
         smsData.forEach(function (d) {
             var diff = locData[0].timestamp;
             var closest = null;
-  
+
 
             for (var i = 0; i < locData.length; i++) {
                 if (Math.abs(locData[i].timestamp - d.timestamp) <= diff) {
@@ -210,9 +153,9 @@ DataProcessor = (function () {
                     break;
             };
 
-            results.data.push({ lon: closest.location.longitude, lat: closest.location.latitude, type: "sms", contact: [d.message.address]});
+            results.data.push({ lon: closest.location.longitude, lat: closest.location.latitude, type: "sms", contact: [d.message.address] });
         });
-       
+
         btData.forEach(function (d) {
             var diff = locData[0].timestamp;
             var closest = null;
@@ -227,14 +170,65 @@ DataProcessor = (function () {
                     break;
             };
             d.devices.forEach(function (x) {
-     
-                    name.push(x.sensible_user_id);
+
+                name.push(x.sensible_user_id);
             });
-            results.data.push({ lon: closest.location.longitude, lat: closest.location.latitude, type: "bt", contact: name});
+            results.data.push({ lon: closest.location.longitude, lat: closest.location.latitude, type: "bt", contact: name });
         });
 
         return results;
     };
+
+
+
+
+    DataProcessor.prototype.gen_collective_data = function (btData, smsData, callData) {
+        var result = [];
+
+        btData.forEach(function (d) {
+            d.devices.forEach(function (x) {
+                if (result.length != 0 &&
+                    (new Date(d.timestamp * 1000)).getDay() == result[result.length - 1].date.getDay()) {
+                    result[result.length - 1].btcount += 1;
+                }
+                else {
+                    result.push({ date: new Date(d.timestamp * 1000), btcount: 1, callcount: 0, smscount: 0 });
+                }
+            });
+        });
+        callData.forEach(function (d) {
+            var added = false;
+            result.forEach(function (e) {
+                if ((new Date(d.timestamp * 1000)).getDay() == e.date.getDay()) {
+                    e.callcount += 1;
+                    added = true;
+                }
+            });
+            if (added == false)
+                result.push({ date: new Date(d.timestamp * 1000), btcount: 0, callcount: 1, smscount: 0 });
+
+        });
+        smsData.forEach(function (d) {
+            var added = false;
+            result.forEach(function (e) {
+                if ((new Date(d.timestamp * 1000)).getDay() == e.date.getDay()) {
+                    e.smscount += 1;
+                    added = true;
+                }
+            });
+            if (added == false)
+                result.push({ date: new Date(d.timestamp * 1000), btcount: 0, callcount: 0, smscount: 1 });
+
+        });
+
+        result.sort(function (a, b) {
+            return a.date - b.date;
+        });
+        return window.open("data:text/json;charset=utf-8," + escape(JSON.stringify({ data: result }, null, 2)));
+    };
+
+
+
 
     return DataProcessor;
 })();
