@@ -1,39 +1,39 @@
 ﻿var WebChart;
+var DAYSLOT = { MORNING: 0, EARLYCLASS: 1, LUNCH: 2, LATECLASS: 3, AFTER: 4 };
 
 WebChart = (function () {
     function WebChart(token) {
 
-        //Layout fields
+        //Main layout fields
+        this.vis = null;       
         this.width = 1200;
         this.height = 750;
         this.center = {
             x: this.width / 2,
             y: this.height / 2
-        };
-        this.zoomed_loc = {
-            x: this.width / 6 + 10,
-            y: this.height / 4 + 30
-        };
-
-        this.layout_gravity = -0.01;
-        this.damper = 0.1;
-        this.zoomed_radius = 120;
-        this.vis = null;
-        this.web = null;
-        this.details = null;
-        this.force = null;
-        this.radius_scale;
+        };        
         this.colors = { call: "#b1f413", sms: "#ffd314", bt: "#7f1ac3" };
         this.shapes = {
             call: "04,00 08,04 05,07 05,08 13,16 14,16 17,13 21,16 17,21 12,21 00,09 00,04 04,00",
             sms: "00,00 25,00 25,15 00,15 00,00 13,7 25,00",
             bt: "00,07 05,10 05,00 12,05 05,10 12,15 05,20 05,10 00,13"
         };
+
+        //Web layour fields
+        this.web = null;
         this.segments = 16;
         this.levels = 3;
         this.points = this.getPoints((this.width - 100) / 3.5, this.segments, this.levels);
+        this.radius_scale;
+
+        //Detailed view layour fields
+        this.details = null;
+        this.zoomed_loc = {
+            x: this.width / 6 + 10,
+            y: this.height / 4 + 30
+        };
+        this.zoomed_radius = 120;
         this.map = null;
-        
 
         //Data fields
         this.token = token;
@@ -48,6 +48,27 @@ WebChart = (function () {
         this.totalScore = 0;
         this.maxFriendship = 0;
         this.minFriendship = 0;
+        this.createNode = function (id, name, cScore, smsScore, bScore) {
+            return {
+                id: id,
+                name: name,
+                x: 0,
+                y: 0,
+                radius: 0,
+                value: 0,
+                callScore: cScore,
+                smsScore: smsScore,
+                btScore: bScore,
+                callData: [],
+                smsData: [],
+                btData: [],
+                totalsData: null,                               
+                callStat: 0,
+                smsStat: 0,
+                btStat: 0,
+                friendshipScore: 0
+            }
+        }
 
         //Control fields		
         this.zoomed = false;
@@ -61,9 +82,10 @@ WebChart = (function () {
 
         var date = new Date(Date.now());
         var obj = this;
-        date.setMonth(date.getMonth() - 1)
+        var starting = date.setMonth(date.getMonth() - 7)
+
         setTimeout(function () {
-            obj.load_data(0, Date.now());
+            obj.load_data(starting, Date.now());
         }, 1000);
     };
 
@@ -71,8 +93,8 @@ WebChart = (function () {
         var chart = this;
         var remaining = 3;
         var runOnce = [false, false, false];
-        this.startTime = start;
-        this.endTime = end;
+        this.startTime = start/1000;
+        this.endTime = end/1000;
         //Load Call probe data
         d3.json(chart.baseUrl + "/call_log/" + chart.token, function (data) {
             if (!runOnce[0]) {
@@ -106,33 +128,12 @@ WebChart = (function () {
 
     WebChart.prototype.create_nodes = function () {
         var chart = this;
-        var currElem = 0;
+        var namesDict = {};
         //Helper functions to parse data and create data nodes
         var extractNumber = function (hash) {
             return hash.substring(17, hash.length - 2)
         }
-        var inWorkHours = function (timestamp) {
-            var date = new Date(timestamp * 1000);
-            return (date.getHours() >= 8 && date.getHours <= 17);
-        }
 
-        var createNode = function (id, name, cScore, smsScore, bScore) {
-            return {
-                id: id,
-                radius: 0,
-                value: 0,
-                callScore: cScore,
-                smsScore: smsScore,
-                btScore: bScore,
-                name: name,
-                x: 0,
-                y: 0,
-                callStat: 0,
-                smsStat: 0,
-                btStat: 0,
-                friendshipScore: 0
-            }
-        }
         //Parse Call data
         chart.callData.forEach(function (d) {
             var name;
@@ -140,128 +141,186 @@ WebChart = (function () {
                 if (l.number == extractNumber(d.call.number))
                     name = l.real_name;
             });
-            if (name && d.timestamp > chart.startTime && d.timestamp < chart.endTime) {
+            if (name) {
                 if (d.call.duration > 5) {
                     var node;
                     var exists = false;
+                    if (chart.nodes[name] == undefined)
+                    {
+                        node = chart.createNode(currElem, name, d.call.duration, 0, 0);
+                        node.callData.push({timestamp: d.timestamp, score: d.call.duration});
+                        chart.nodes.push(node);
+                        namesDict[name] = chart.nodes.length -1;
+                    }
+                    else
+                    {
+                        chart.nodes[name].callScore += d.call.duration;
+                        chart.nodes[name].callStat += d.call.duration;
+                        chart.nodes[name].callData.push({timestamp: d.timestamp, score: d.call.duration});
+                    }
+
                     chart.nodes.forEach(function (x) {
                         if (x.name == name) {
                             x.callScore += d.call.duration;
                             x.callStat += d.call.duration;
                             x.friendshipScore += inWorkHours(d.timestamp) ? d.call.duration : d.call.duration * 0.5;
+                            x.callData.push(d.timestamp);
                             exists = true;
                         }
                     });
-                    if (!exists) {
-                        node = createNode(currElem, name, d.call.duration, 0, 0);
+                    else{
+                        node = chart.createNode(currElem, name, d.call.duration, 0, 0);
                         node.callStat += d.call.duration;
                         node.friendshipScore += inWorkHours(d.timestamp) ? d.call.duration : d.call.duration * 0.5;
+                        node.callData.push(d.timestamp);
                         currElem++;
                         return chart.nodes.push(node);
                     }
                 }
             }
         });
+              
+        //Parse Call data
+        //chart.callData.forEach(function (d) {
+        //    var name;
+        //    fake.forEach(function (l) {
+        //        if (l.number == extractNumber(d.call.number))
+        //            name = l.real_name;
+        //    });
+        //    if (name) {
+        //        if (d.call.duration > 5) {
+        //            var node;
+        //            var exists = false;
+        //            chart.nodes.forEach(function (x) {
+        //                if (x.name == name) {
+        //                    x.callScore += d.call.duration;
+        //                    x.callStat += d.call.duration;
+        //                    x.friendshipScore += inWorkHours(d.timestamp) ? d.call.duration : d.call.duration * 0.5;
+        //                    x.callData.push(d.timestamp);
+        //                    exists = true;
+        //                }
+        //            });
+        //            if (!exists) {
+        //                node = chart.chart.createNode(currElem, name, d.call.duration, 0, 0);
+        //                node.callStat += d.call.duration;
+        //                node.friendshipScore += inWorkHours(d.timestamp) ? d.call.duration : d.call.duration * 0.5;
+        //                node.callData.push(d.timestamp);
+        //                currElem++;
+        //                return chart.nodes.push(node);
+        //            }
+        //        }
+        //    }
+        //});
 
-        //Parse SMS data
-        chart.smsData.forEach(function (d) {
-            var name;
-            fake.forEach(function (l) {
-                if (l.number == extractNumber(d.message.address))
-                    name = l.real_name;
-            });
-            if (name && d.timestamp > chart.startTime && d.timestamp < chart.endTime) {
-                var node;
-                var exists = false;
-                chart.nodes.forEach(function (x) {
-                    if (x.name == name) {
-                        x.smsScore += 1;
-                        x.smsStat += 1;
-                        x.friendshipScore += inWorkHours(d.timestamp) ? 1 : 0.5;
-                        exists = true;
-                    }
-                });
-                if (!exists) {
-                    node = createNode(currElem, name, 0, 1, 0);
-                    node.smsStat += 1;
-                    node.friendshipScore += inWorkHours(d.timestamp) ? 1 : 0.5;
-                    currElem++;
-                    return chart.nodes.push(node);
-                }
-            }
-        });
+        ////Parse SMS data
+        //chart.smsData.forEach(function (d) {
+        //    var name;
+        //    fake.forEach(function (l) {
+        //        if (l.number == extractNumber(d.message.address))
+        //            name = l.real_name;
+        //    });
+        //    if (name && d.timestamp > chart.startTime && d.timestamp < chart.endTime) {
+        //        var node;
+        //        var exists = false;
+        //        chart.nodes.forEach(function (x) {
+        //            if (x.name == name) {
+        //                x.smsScore += 1;
+        //                x.smsStat += 1;
+        //                x.friendshipScore += inWorkHours(d.timestamp) ? 1 : 0.5;
+        //                x.smsData.push(d.timestamp);
+        //                exists = true;
+        //            }
+        //        });
+        //        if (!exists) {
+        //            node = chart.createNode(currElem, name, 0, 1, 0);
+        //            node.smsStat += 1;
+        //            node.friendshipScore += inWorkHours(d.timestamp) ? 1 : 0.5;
+        //            node.smsData.push(d.timestamp);
+        //            currElem++;
+        //            return chart.nodes.push(node);
+        //        }
+        //    }
+        //});
 
-        //Parse Bluetooth data
-        chart.btData.forEach(function (d) {
-            d.devices.forEach(function (x) {
-                var name;
-                fake.forEach(function (l) {
-                    if (x.sensible_user_id == l.sensible_user_id)
-                        name = l.real_name;
-                });
-                var lastContact = 0;
-                if (name && d.timestamp > chart.startTime && d.timestamp < chart.endTime) {
-                    var node;
-                    var exists = false;
-                    chart.nodes.forEach(function (e) {
-                        if (e.name == name) {
-                            e.btScore += (e.lastContact - d.timestamp > 300000) ? 300 : 5;
-                            e.lastContact = d.timestamp;
-                            e.friendshipScore += inWorkHours(d.timestamp) ? 0 : 300;
-                            e.btStat += 1;
-                            exists = true;
-                        }
-                    });
-                    if (!exists) {
-                        node = createNode(currElem, name, 0, 0, 1);
-                        node.lastContact = d.timestamp;
-                        node.btStat += 1;
-                        node.friendshipScore += inWorkHours(d.timestamp) ? 0 : 5;
-                        currElem++;
-                        return chart.nodes.push(node);
-                    }
-                }
-            })
-        });
+        ////Parse Bluetooth data
+        //chart.btData.forEach(function (d) {
+        //    d.devices.forEach(function (x) {
+        //        var name;
+        //        fake.forEach(function (l) {
+        //            if (x.sensible_user_id == l.sensible_user_id)
+        //                name = l.real_name;
+        //        });
+        //        if (!name) name = x.sensible_user_id;
+        //        var lastContact = 0;
+        //        if (name && d.timestamp > chart.startTime && d.timestamp < chart.endTime) {
+        //            var node;
+        //            var exists = false;
+        //            chart.nodes.forEach(function (e) {
+        //                if (e.name == name) {
+        //                    e.btScore += (e.lastContact - d.timestamp > 300000) ? 300 : 5;
+        //                    e.lastContact = d.timestamp;
+        //                    e.friendshipScore += inWorkHours(d.timestamp) ? 0 : 300;
+        //                    e.btData.push(d.timestamp);
+        //                    e.btStat += 1;
+        //                    exists = true;
+        //                }
+        //            });
+        //            if (!exists) {
+        //                node = chart.createNode(currElem, name, 0, 0, 1);
+        //                node.lastContact = d.timestamp;
+        //                node.btStat += 1;
+        //                node.friendshipScore += inWorkHours(d.timestamp) ? 0 : 5;
+        //                node.btData.push(d.timestamp);
+        //                currElem++;
+        //                return chart.nodes.push(node);
+        //            }
+        //        }
+        //    })
+        //});
         
-        var max_amount = 0;
-        chart.minFriendship = chart.nodes[0].friendshipScore;
-        //Find the maximums to normalize
-        chart.nodes.forEach(function (d) {
-            chart.maxBtScore = d.btScore > chart.maxBtScore ? d.btScore : chart.maxBtScore;
-            chart.maxCallScore = d.callScore > chart.maxCallScore ? d.callScore : chart.maxCallScore;
-            chart.maxSmsScore = d.smsScore > chart.maxSmsScore ? d.smsScore : chart.maxSmsScore;
-            chart.maxFriendship = d.friendshipScore > chart.maxFriendship ? d.friendshipScore : chart.maxFriendship;
-            chart.minFriendship = d.friendshipScore < chart.minFriendship ? d.friendshipScore : chart.minFriendship;
-        });
-        //Calculate value ("final score") for each node
-        chart.nodes.forEach(function (d) {         
-            //Normalize            
-            d.smsScore /= chart.maxSmsScore;
-            d.btScore /= chart.maxBtScore;
-            d.callScore /= chart.maxCallScore;
+        //var max_amount = 0;
+        //chart.minFriendship = chart.nodes[0].friendshipScore;
+        ////Find the maximums to normalize
+        //chart.nodes.forEach(function (d) {
+        //    chart.maxBtScore = d.btScore > chart.maxBtScore ? d.btScore : chart.maxBtScore;
+        //    chart.maxCallScore = d.callScore > chart.maxCallScore ? d.callScore : chart.maxCallScore;
+        //    chart.maxSmsScore = d.smsScore > chart.maxSmsScore ? d.smsScore : chart.maxSmsScore;
+        //    chart.maxFriendship = d.friendshipScore > chart.maxFriendship ? d.friendshipScore : chart.maxFriendship;
+        //    chart.minFriendship = d.friendshipScore < chart.minFriendship ? d.friendshipScore : chart.minFriendship;
+        //});
+        ////Calculate value ("final score") for each node
+        //chart.nodes.forEach(function (d) {         
+        //    //Normalize            
+        //    d.smsScore /= chart.maxSmsScore;
+        //    d.btScore /= chart.maxBtScore;
+        //    d.callScore /= chart.maxCallScore;
 
-            var scores = [d.callScore, d.smsScore, d.btScore];
-            var toLabel = ["call", "sms", "bt"]
-            var maxIndex = 0;
+        //    var scores = [d.callScore, d.smsScore, d.btScore];
+        //    var toLabel = ["call", "sms", "bt"]
+        //    var maxIndex = 0;
 
-            maxIndex = scores.indexOf(Math.max.apply(null, scores));
-            d.value = d.callScore + d.smsScore + d.btScore;
-            d.group = toLabel[maxIndex];
+        //    maxIndex = scores.indexOf(Math.max.apply(null, scores));
+        //    d.value = d.callScore + d.smsScore + d.btScore;
+        //    d.group = toLabel[maxIndex];
 
-            chart.totalScore += d.callScore + d.smsScore + d.btScore;
-            max_amount = d.value > max_amount ? d.value : max_amount;
-        });
+        //    chart.totalScore += d.callScore + d.smsScore + d.btScore;
+        //    max_amount = d.value > max_amount ? d.value : max_amount;
+        //});
 
-        var max_radius = d3.scale.pow().exponent(0.5).domain([0, 1500]).range([50, 30]);
-        chart.radius_scale = d3.scale.pow().exponent(0.5).domain([0, max_amount]).range([2, max_radius(chart.totalScore)]);
-        chart.nodes.forEach(function (d) {
-            d.radius = chart.radius_scale(d.value)
-        });
-        chart.nodes.sort(function (a, b) {
-            return b.value - a.value;
-        });
+        //var max_radius = d3.scale.pow().exponent(0.5).domain([0, 1500]).range([50, 30]);
+        //chart.radius_scale = d3.scale.pow().exponent(0.5).domain([0, max_amount]).range([2, max_radius(chart.totalScore)]);
         
+        //chart.nodes.sort(function (a, b) {
+        //    return b.value - a.value;
+        //});
+        //chart.nodes = chart.nodes.slice(0, 16);
+        //var dProcessor = new DataProcessor();
+        //chart.nodes.forEach(function (d) {
+        //    d.radius = chart.radius_scale(d.value)
+        //    d.totalsData = dProcessor.gen_totals_data(d.callData, d.smsData, d.btData);
+        //});
+
+       
         screen.hide_loading_screen();
         return chart.create_vis();
     };
@@ -289,7 +348,7 @@ WebChart = (function () {
 
         this.web = this.vis.append("g").attr("id", "Web");
         this.details = this.vis.append("g").attr("id", "Details");
-        this.circles = this.web.selectAll("circle").data(this.nodes.slice(0,16), function (d) {
+        this.circles = this.web.selectAll("circle").data(this.nodes, function (d) {
             return d.id;
         });
 
@@ -509,16 +568,15 @@ WebChart = (function () {
 
         map.draw_map(chart.token);
         this.draw_multichart(d);
-        this.draw_barschart(d);
+        //this.draw_barschart(d);
         this.draw_pie_chart(d);
     };
+
     WebChart.prototype.draw_barschart = function (d) {
         var chart = this;
         var g = chart.details.append("g").attr("id", "barschart").attr("transform", "translate(595,500)");
 
-        d3.json(chart.baseUrl + "/collective/" + chart.token, function (error, data) {
-            var dProcessor = new DataProcessor();
-            var data = dProcessor.gen_timeline_data(data);
+
 
             var width = 600,
             height = 200;
@@ -604,7 +662,7 @@ WebChart = (function () {
                 .style("text-anchor", "end")
                 .text(function (d) { return d; });
 
-        });
+ 
 
        
     };
@@ -612,27 +670,21 @@ WebChart = (function () {
     WebChart.prototype.draw_multichart = function (d) {
         var chart = this;
         var g = chart.details.append("g").attr("id", "totalschart").attr("transform", "translate(595,100)");
+        var toLabel = ["call", "sms", "bt"];
 
-        d3.json(chart.baseUrl + "/collective/" + chart.token, function (error, data) {
-            var dProcessor = new DataProcessor();
-            var data = dProcessor.gen_timeline_data(data);
+            var data = d.totalsData; 
 
             var width = 600,
             height = 200;
 
-            var parseDate = d3.time.format("%Y%m%d").parse;
-
             var x = d3.time.scale()
-                .range([0, width]).domain(d3.extent(data[0], function (d) { return d.date; }));
+                .range([0, width]).domain([new Date(chart.startTime * 1000), new Date(chart.endTime* 1000)]);//d3.extent(data[0], function (d) { return d.date; }));
 
             var y = d3.scale.linear()
                 .range([height, 0]).domain([
-                d3.min(data, function (c) { return d3.min(c, function (v) { return v.y; }); }),
-                d3.max(data, function (c) { return d3.max(c, function (v) { return v.y; }); })
+                d3.min(data, function (c) { return d3.min(c, function (v) { return v.count; }); }),
+                d3.max(data, function (c) { return d3.max(c, function (v) { return v.count; }); })
                 ]);
-
-          
-            var color = d3.scale.category10();
 
             var xAxis = d3.svg.axis()
                 .scale(x)
@@ -645,7 +697,7 @@ WebChart = (function () {
             var line = d3.svg.line()
                 .interpolate("basis")
                 .x(function (d) { return x(d.date); })
-                .y(function (d) { return y(d.y); });
+                .y(function (d) { return y(d.count); });
 
 
 
@@ -677,13 +729,7 @@ WebChart = (function () {
                     return line(d);
                 })
                 .style("stroke", function (d, i) {
-
-                    if (i == 0)
-                        return "#7f1ac3";
-                    if (i == 1)
-                        return "#b1f413";
-                    if (i == 2)
-                        return "#ffd314";
+                    return chart.colors[toLabel[i]];
                 })
             .style("fill", "none");
 
@@ -696,7 +742,6 @@ WebChart = (function () {
             //    .text(function (d) { return d.name; });
 
 
-        });
 
 
     };
@@ -989,6 +1034,20 @@ WebChart = (function () {
             }
         }
         return points;
+    };
+
+    WebChart.prototype.get_timeslot = function (timestamp) {
+        var date = new Date(timestamp);
+        if (date.getHours() < 8)
+            return DAYSLOT.MORNING;
+        else if (date.getHours() >= 8 && date.getHours() < 12)
+            return DAYSLOT.EARLYCLASS;
+        else if (date.getHours() >= 12 && date.getHours() < 13)
+            return DAYSLOT.LUNCH;
+        else if (date.getHours() >= 13 && date.getHours() < 17)
+            return DAYSLOT.LATECLASS;
+        else
+            return DAYSLOT.AFTER;
     };
        
     return WebChart;

@@ -8,6 +8,7 @@ DataProcessor = (function () {
 
 
  
+  
 
     DataProcessor.prototype.parse_collective_data = function (btData, smsData, callData) {
         var result = [];
@@ -108,15 +109,65 @@ DataProcessor = (function () {
         return result;
     };
 
+    DataProcessor.prototype.gen_totals_data = function (cdata, sdata, bdata) {
+        var results = [[], [], []];
+
+        cdata.forEach(function (d) {
+            var found = false;
+            var newDate = new Date (d * 1000);
+            results[0].forEach(function (x) {
+                if (x.date.toLocaleDateString() == newDate.toLocaleDateString()) {
+                    x.count += 1;
+                    found = true;
+                }
+            });
+            if (!found)
+                results[0].push({ date: newDate, count: 1 });
+
+        });
+
+        sdata.forEach(function (d) {
+            var found = false;
+            var newDate = new Date(d * 1000);
+            results[1].forEach(function (x) {
+                if (x.date.toLocaleDateString() == newDate.toLocaleDateString()) {
+                    x.count += 1;
+                    found = true;
+                }
+            });
+            if (!found)
+                results[1].push({ date: newDate, count: 1 });
+
+        });
+
+        bdata.forEach(function (d) {
+            var found = false;
+            var newDate = new Date(d * 1000);
+            results[2].forEach(function (x) {
+                if (x.date.toLocaleDateString() == newDate.toLocaleDateString()) {
+                    x.count += 1;
+                    found = true;
+                }
+            });
+            if (!found)
+                results[2].push({ date: newDate, count: 1 });
+
+        });
+
+        return results;
+
+    };
+
     DataProcessor.prototype.gen_timeline_data = function (data) {
 
         var result = [[], [], []];
 
 
         data.data.forEach(function (d, i) {
-            result[0].push({ date: new Date(d.date), x: i, y: d.btcount, y0: 0 });
-            result[1].push({ date: new Date(d.date), x: i, y: d.callcount, y0: d.btcount });
-            result[2].push({ date: new Date(d.date), x: i, y: d.smscount, y0: d.callcount + d.btcount });
+            
+            result[0].push({ date: new Date(d.date), x: i, y: d.callcount, y0: 0 });
+            result[1].push({ date: new Date(d.date), x: i, y: d.smscount, y0: d.callcount });
+            result[2].push({ date: new Date(d.date), x: i, y: d.btcount, y0: d.callcount + d.smscount });
         });
 
         return result;
