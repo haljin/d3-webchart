@@ -116,9 +116,8 @@ MapView = (function () {
     };
 
     MapView.prototype.draw_points = function (data) {
-        var dp = new DataProcessor();
         var map = this;        
-        this.points = dp.parse_loc_data(data.data, this.accuracy, map.subject.name);
+        this.points = DataProcessor.parse_loc_data(data.data, this.accuracy, map.subject.name);
         var range = [d3.min(this.points, function (d) { return d.count; }),
             d3.max(this.points, function (d) { return d.count; })];
         var colorScale = d3.scale.linear().range([0.5, 0.9]).domain(range);

@@ -5,13 +5,13 @@ WebChart = (function () {
     function WebChart(token) {
 
         //Main layout fields
-        this.vis = null;       
+        this.vis = null;
         this.width = 1200;
         this.height = 750;
         this.center = {
             x: this.width / 2,
             y: this.height / 2
-        };        
+        };
         this.colors = { call: "#b1f413", sms: "#ffd314", bt: "#7f1ac3" };
         this.shapes = {
             call: "04,00 08,04 05,07 05,08 13,16 14,16 17,13 21,16 17,21 12,21 00,09 00,04 04,00",
@@ -45,7 +45,7 @@ WebChart = (function () {
         this.displayedNodes = [];
         this.maxCallScore = 0;
         this.maxSmsScore = 0;
-        this.maxBtScore = 0;        
+        this.maxBtScore = 0;
         this.totalScore = 0;
         this.maxFriendship = 0;
         this.minFriendship = 0;
@@ -63,7 +63,8 @@ WebChart = (function () {
                 callData: [],
                 smsData: [],
                 btData: [],
-                totalsData: null,                               
+                totalsData: null,
+                binsData: null,
                 callStat: 0,
                 smsStat: 0,
                 btStat: 0,
@@ -95,8 +96,8 @@ WebChart = (function () {
         var chart = this;
         var remaining = 3;
         var runOnce = [false, false, false];
-        this.startTime = start/1000;
-        this.endTime = end/1000;
+        this.startTime = start / 1000;
+        this.endTime = end / 1000;
         //Load Call probe data
         d3.json(chart.baseUrl + "/call_log/" + chart.token, function (data) {
             if (!runOnce[0]) {
@@ -125,7 +126,7 @@ WebChart = (function () {
                     chart.create_nodes();
             }
         });
-    
+
     };
 
     WebChart.prototype.create_nodes = function () {
@@ -146,15 +147,13 @@ WebChart = (function () {
             if (name) {
                 if (d.call.duration > 5) {
                     var node;
-                    if (namesDict[name] == undefined)
-                    {
+                    if (namesDict[name] == undefined) {
                         node = chart.createNode(chart.nodes.length, name, 0, 0, 0);
-                        node.callData.push({timestamp: d.timestamp, score: d.call.duration});
+                        node.callData.push({ timestamp: d.timestamp, score: d.call.duration });
                         chart.nodes.push(node);
                         namesDict[name] = chart.nodes.length - 1;
                     }
-                    else
-                    {
+                    else {
                         chart.nodes[namesDict[name]].callData.push({ timestamp: d.timestamp, score: d.call.duration });
                     }
                 }
@@ -201,7 +200,6 @@ WebChart = (function () {
                         var score = (chart.nodes[namesDict[name]].lastContact - d.timestamp > 300000) ? 300 : 5;
                         chart.nodes[namesDict[name]].btData.push({ timestamp: d.timestamp, score: score });
                     }
-                    
                 }
             })
         });
@@ -210,17 +208,16 @@ WebChart = (function () {
 
     };
 
-    WebChart.prototype.update_vis = function()
-    {
+    WebChart.prototype.update_vis = function () {
         var chart = this;
         var inWorkHours = function (timestamp) {
-            var result = chart.get_timeslot(new Date(timestamp * 1000));
+            var result = DataProcessor.get_timeslot(new Date(timestamp * 1000));
             return DAYSLOT.EARLYCLASS || DAYSLOT.LATECLASS;
         }
 
         chart.nodes.forEach(function (d) {
             for (var i = 0; i < d.callData.length; i++) {
-                if (d.callData[i].timestamp > chart.endTime) break;                    
+                if (d.callData[i].timestamp > chart.endTime) break;
                 if (d.callData[i].timestamp > chart.startTime) {
                     d.callScore += d.callData[i].score;
                     d.callStat += d.callData[i].score;
@@ -256,11 +253,11 @@ WebChart = (function () {
             chart.minFriendship = d.friendshipScore < chart.minFriendship ? d.friendshipScore : chart.minFriendship;
         });
         //Calculate value ("final score") for each node
-        chart.nodes.forEach(function (d) {         
+        chart.nodes.forEach(function (d) {
             //Normalize            
-            d.smsScore /= chart.maxSmsScore;
-            d.btScore /= chart.maxBtScore;
-            d.callScore /= chart.maxCallScore;
+            //d.smsScore /= chart.maxSmsScore;
+            //d.btScore /= chart.maxBtScore;
+            // d.callScore /= chart.maxCallScore;
 
             var scores = [d.callScore, d.smsScore, d.btScore];
             var toLabel = ["call", "sms", "bt"]
@@ -275,19 +272,20 @@ WebChart = (function () {
         });
 
         var max_radius = d3.scale.pow().exponent(0.5).domain([0, 1500]).range([50, 30]);
-        chart.radius_scale = d3.scale.pow().exponent(0.5).domain([0, max_amount]).range([2, max_radius(chart.totalScore)]);
-        
+        chart.radius_scale = d3.scale.pow().exponent(0.5).domain([0, max_amount]).range([10, 50]);//max_radius(chart.totalScore)]);
+
         chart.nodes.sort(function (a, b) {
             return b.value - a.value;
         });
         chart.displayedNodes = chart.nodes.slice(0, 16);
-        var dProcessor = new DataProcessor();
         chart.displayedNodes.forEach(function (d) {
             d.radius = chart.radius_scale(d.value)
-            d.totalsData = dProcessor.parse_totals_data(d.callData, d.smsData, d.btData);
+            var parsed = DataProcessor.parse_totals_data(d.callData, d.smsData, d.btData);
+            d.totalsData = parsed.totals;
+            d.binsData = parsed.bins;
         });
 
-       
+
         screen.hide_loading_screen();
         return chart.create_vis();
     };
@@ -327,7 +325,7 @@ WebChart = (function () {
                     return chart.unzoom_circle();
                 }
         });
-            
+
 
         //dookola  
         for (level = 0; level < chart.levels; level++) {
@@ -336,10 +334,9 @@ WebChart = (function () {
                 var nextIdx = j + 1 < chart.segments ? j + 1 : 0;
                 var nextPoint = chart.points.byLevel[level][nextIdx];
                 var nextPoint1Control = { x: 0, y: 0 }, nextPoint2Control = { x: 0, y: 0 };
-                var getRandomArbitary= function(min, max) {
+                var getRandomArbitary = function (min, max) {
                     return Math.random() * (max - min) + min;
                 }
-                
                 nextPoint1Control.x = point.x * getRandomArbitary(0.85, 0.97);
                 nextPoint1Control.y = point.y * getRandomArbitary(0.85, 0.97);
                 nextPoint2Control.x = nextPoint.x * getRandomArbitary(0.85, 0.97);
@@ -348,34 +345,42 @@ WebChart = (function () {
                 this.web.append("path")
                     .attr("d", " M " + point.x + "," + point.y + " C " + nextPoint1Control.x + "," + nextPoint1Control.y + " "
                     + nextPoint2Control.x + "," + nextPoint2Control.y + " " + nextPoint.x + "," + nextPoint.y)
-                    .attr("fill","none")
+                    .attr("fill", "none")
                 //.attr("d", "M " + point.x + " " + point.y + " L " + nextPoint.x + " " + nextPoint.y)
                 .style("stroke", "#055");
             }
         }
-  
+
         //wysokosc
         for (segment = 0; segment < chart.segments; segment++) {
             console.debug(chart.points.bySegment[segment]);
             var start = chart.points.bySegment[segment][0];
             var end = chart.points.bySegment[segment][chart.levels];
             this.web.append("path")
-             
+
             .attr("d", "M" + start.x + " " + start.y + " L " + end.x + " " + end.y)
             .style("stroke", "#000");
         }
-    
-        var getPoints = function() {
+        chart.web.append("image")
+            .attr("id", "userAvatarMain")
+            .attr("xlink:href", "data/unknown-person.gif")
+            .attr("x", -60)
+            .attr("y", -100)
+            .attr("width", 120)
+            .attr("height", 200);
+
+
+
+        var getPoints = function () {
             var result = [];
             for (var i = 0 ; i < chart.segments ; i++)
-                result.push(d3.scale.linear().domain([chart.minFriendship, chart.maxFriendship]).range([chart.points.byLevel[1][i], chart.points.byLevel[chart.levels - 1][i]]));
+                result.push(d3.scale.linear().domain([chart.minFriendship, chart.maxFriendship]).range([chart.points.byLevel[chart.levels - 1][i], chart.points.byLevel[0][i]]));
             return result;
         };
         var friendScale = d3.scale.linear().range([0, chart.maxFriendship]);
         var points = getPoints();
         points.randomize();
 
-        
         this.circles.enter().append("circle")
             .attr("r", 0)
             .attr("fill", function (d) {
@@ -386,12 +391,12 @@ WebChart = (function () {
             }).attr("id", function (d) {
                 return "bubble_" + d.id;
             }).attr("cx", function (d, i) {
-                d.x = points[i](chart.maxFriendship).x
-                return points[i](chart.maxFriendship).x;
+                d.x = points[i](chart.minFriendship).x
+                return points[i](chart.minFriendship).x;
             })
             .attr("cy", function (d, i) {
-                d.y = points[i](chart.maxFriendship).y
-                return points[i](chart.maxFriendship).y;
+                d.y = points[i](chart.minFriendship).y
+                return points[i](chart.minFriendship).y;
             })
             .on("mouseover", function (d, i) {
                 return chart.show_details(d, i, this);
@@ -400,21 +405,12 @@ WebChart = (function () {
             }).on("click", function (d, i) {
                 if (!chart.inTransition && !chart.zoomed) {
                     chart.inTransition = true;
-                    chart.hide_details(d, i, this);                    
+                    chart.hide_details(d, i, this);
                     return chart.zoom_circle(d);
                 }
             });
 
-
-        chart.web.append("image")
-            .attr("id", "userAvatarMain")
-            .attr("xlink:href", "data/unknown-person.gif")
-            .attr("x", -60)
-            .attr("y", -100)
-            .attr("width", 120)
-            .attr("height", 200);
-
-
+        
         return this.circles.transition().duration(2000).attr("r", function (d) {
             return d.radius;
         }).each("end", function () {
@@ -427,11 +423,7 @@ WebChart = (function () {
                 return points[i](d.friendshipScore).y;
             });
         });
-        
     };
-
-   
-
 
     WebChart.prototype.zoom_circle = function (d) {
         var chart = this;
@@ -468,7 +460,7 @@ WebChart = (function () {
 		.attr("fill", chart.colors[d.group])
 		.attr("stroke-width", 2)
 		.attr("stroke", d3.rgb(chart.colors[d.group]).darker())
-        .attr("transform", "translate(" + chart.center.x  + ", " +chart.center.y  + ")")
+        .attr("transform", "translate(" + chart.center.x + ", " + chart.center.y + ")")
 		.transition()
 		.ease("elastic")
         .attr("transform", "translate(0,0)")
@@ -479,7 +471,6 @@ WebChart = (function () {
 		.each('end', function () {
 		    if (chart.zoomed)
 		        chart.draw_details(d);
-
 		});
     };
 
@@ -489,6 +480,7 @@ WebChart = (function () {
         var new_circle = this.vis.selectAll("#circle-zoomed");
 
         map.undraw_map();
+        chart.undraw_barschart();
         chart.undraw_multichart();
 
         //Lighten other circles
@@ -500,7 +492,7 @@ WebChart = (function () {
 
         this.web.transition().duration(1000)
         .attr("transform", function (d) {
-            return "translate(" + chart.center.x + ", " + (chart.center.y )+ ") scale(1)";
+            return "translate(" + chart.center.x + ", " + (chart.center.y) + ") scale(1)";
         });
         //Destroy the pie chart, unzoom the circle
         chart.undraw_pie_chart().each('end', function () {
@@ -521,117 +513,154 @@ WebChart = (function () {
 			    chart.inTransition = false;
 			});
         });
-        
+
     };
 
-
-
-  
     WebChart.prototype.draw_details = function (d) {
         map = new MapView(d);
 
         this.details.append("g").attr("id", "map");
-        
+
 
         map.draw_map(chart.token);
         this.draw_multichart(d);
-        //this.draw_barschart(d);
+        this.draw_barschart(d,2);
         this.draw_pie_chart(d);
     };
 
-    WebChart.prototype.draw_barschart = function (d) {
+    WebChart.prototype.draw_barschart = function (d, type) {
         var chart = this;
         var g = chart.details.append("g").attr("id", "barschart").attr("transform", "translate(595,500)");
+        var width = 600,
+            height = 200;
+        var data = d.binsData;
+        var toLabel = ["call", "sms", "bt"];
 
-
-
-            var width = 600,
+        var parseDate = d3.time.format("%Y%m%d").parse;
+        var width = 600,
             height = 200;
 
-            var parseDate = d3.time.format("%Y%m%d").parse;
-            var width = 600,
-             height = 200;
+        var x0 = d3.scale.ordinal()
+            .rangeRoundBands([0, width], .1);
 
-            var x0 = d3.scale.ordinal()
-                .rangeRoundBands([0, width], .1);
+        var x1 = d3.scale.ordinal();
 
-            var x1 = d3.scale.ordinal();
+        var y = d3.scale.linear()
+            .range([height, 0]);
+        var color = chart.colors[toLabel[type]];
+        var colors = d3.scale.ordinal()
+            .range([d3.rgb(color).darker().darker(), d3.rgb(color).darker(),
+                color, d3.rgb(color).brighter(), d3.rgb(color).brighter().brighter()]);
 
-            var y = d3.scale.linear()
-                .range([height, 0]);
+        var xAxis = d3.svg.axis()
+            .scale(x0)
+            .orient("bottom");
 
-            var color = d3.scale.ordinal()
-                .range(["#98abc5", "#8a89a6", "#7b6888", "#6b486b", "#a05d56", "#d0743c", "#ff8c00"]);
+        var yAxis = d3.svg.axis()
+            .scale(y)
+            .orient("left")
+            .tickFormat(d3.format(".2s"));
+        var hourNames = ["00:00-08:00", "08:00-12:00", "12:00-13:00", "13:00-17:00", "17:00-00:00"];
+        x0.domain(data[type].map(function (d) { return d.day; }));
+        x1.domain(hourNames).rangeRoundBands([0, x0.rangeBand()]);//buckets
+        y.domain([0, d3.max(data[type], function (d) { return d3.max(d.slots, function (v) { return v.count; }); })]);
 
-            var xAxis = d3.svg.axis()
-                .scale(x0)
-                .orient("bottom");
+        g.append("g")
+        .attr("class", "x axis")
+            .attr("transform", "translate(0," + height + ")")
+            .call(xAxis);
 
-            var yAxis = d3.svg.axis()
-                .scale(y)
-                .orient("left")
-                .tickFormat(d3.format(".2s"));
+        g.append("g")
+        .attr("class", "y axis")
+            .call(yAxis)
+          .append("text")
+            .attr("transform", "rotate(-90)")
+            .attr("y", 6)
+            .attr("dy", ".71em")
+            .style("text-anchor", "end")
+            .text("Population");
 
-            
+        var state = g.selectAll(".state")
+            .data(data[type])
+          .enter().append("g")
+            .attr("class", "g")
+            .attr("transform", function (d) { return "translate(" + x0(d.day) + ",0)"; });
 
-          
+        state.selectAll("rect")
+            .data(function (d) { return d.slots; })
+          .enter().append("rect")
+            .attr("width", x1.rangeBand())
+            .attr("x", function (d) { return x1(d.time); })
+            .attr("y", function (d) {
+                return y(d.count);
+            })
+            .attr("height", function (d) {
+                return height - y(d.count);
+            })
+            .style("fill", function (d) { return colors(d.time); });
 
-            x0.domain(data.map(function (d) { return d.date; }));
-            x1.domain(d).rangeRoundBands([0, x0.rangeBand()]);//buckets
-            y.domain([0, d3.max(data, function (d) { return d3.max(d, function (v) { return v.y; }); })]);
-               
-            g.append("g")
-            .attr("class", "x axis")
-                .attr("transform", "translate(0," + height + ")")
-                .call(xAxis);
+        var legend = g.selectAll(".legend")
+            .data(hourNames.slice().reverse())
+          .enter().append("g")
+            .attr("class", "legend")
+            .attr("transform", function (d, i) { return "translate(0," + i * 20 + ")"; });
 
-            g.append("g")
-            .attr("class", "y axis")
-                .call(yAxis)
-              .append("text")
-                .attr("transform", "rotate(-90)")
-                .attr("y", 6)
-                .attr("dy", ".71em")
-                .style("text-anchor", "end")
-                .text("Population");
+        legend.append("rect")
+            .attr("x", width - 18)
+            .attr("width", 18)
+            .attr("height", 18)
+            .style("fill",  colors );
 
-            var state = g.selectAll(".state")
-                .data(data)
-              .enter().append("g")
-                .attr("class", "g")
-                .attr("transform", function (d) { return "translate(" + x0(d.date) + ",0)"; });
+        legend.append("text")
+            .attr("x", width - 24)
+            .attr("y", 9)
+            .attr("dy", ".35em")
+            .style("text-anchor", "end")
+            .text(function (d) { return d; });
 
-            state.selectAll("rect")
-                .data(function (d) { return d; })
-              .enter().append("rect")
-                .attr("width", x1.rangeBand())
-                .attr("x", function (d) { return x1(d.x); })
-                .attr("y", function (d) { return y(d.y); })
-                .attr("height", function (d) { return height - y(d.x); })
-                .style("fill", function (d) { return color(d.y); });
+        var buttons = g.selectAll(".barbutton").data([0, 1, 2]).enter()
+            .append("g")
+            .attr("class", "barbutton")
+            .on("mouseover", function (d) { d3.select(this).select("rect").style("stroke-width", "1px").style("stroke", "#000000"); })
+            .on("mouseout", function (d) { d3.select(this).select("rect").style("stroke-width", "0px").style("stroke", "none") })
+            .on("click", function (x, i) { 
+                if (i != type) {
+                    chart.undraw_barschart();
+                    chart.draw_barschart(d, i);
+                }
+                });
 
-            var legend = g.selectAll(".legend")
-                .data(d.slice().reverse())
-              .enter().append("g")
-                .attr("class", "legend")
-                .attr("transform", function (d, i) { return "translate(0," + i * 20 + ")"; });
+        buttons.append("rect")
+            .attr("x", function (d, i) { return -5 + i * 40; })
+            .attr("y", -102)
+            .attr("width", 30)
+            .attr("height", 30)
+            .attr("fill", "#ffffff")
+            .style("fill", function (d, i) { if (i == type) return "#eeeeee"; else return "none"; });
+        buttons.append("polyline")
+            .attr("transform", function (d, i) {
+                switch (i) {
+                    case 0:
+                        return "translate(0, -100)";
+                    case 1:
+                        return "translate(38, -95)";
+                    case 2:
+                        return "translate(80, -95)";
+                }
+            })
+            .attr("stroke", function (d, i) {
+                return chart.colors[toLabel[i]];
+            })
+            .attr("class", "symbol")
+            .style("stroke-width", "2px")
+           .style("fill", "none")
+            .attr("points", function (d, i) {
+                return chart.shapes[toLabel[i]];
+            });
 
-            legend.append("rect")
-                .attr("x", width - 18)
-                .attr("width", 18)
-                .attr("height", 18)
-                .style("fill", color);
 
-            legend.append("text")
-                .attr("x", width - 24)
-                .attr("y", 9)
-                .attr("dy", ".35em")
-                .style("text-anchor", "end")
-                .text(function (d) { return d; });
 
- 
 
-       
     };
 
     WebChart.prototype.draw_multichart = function (d) {
@@ -639,82 +668,87 @@ WebChart = (function () {
         var g = chart.details.append("g").attr("id", "totalschart").attr("transform", "translate(595,100)");
         var toLabel = ["call", "sms", "bt"];
 
-            var data = d.totalsData; 
+        var data = d.totalsData;
 
-            var width = 600,
-            height = 200;
+        var width = 600,
+        height = 200;
 
-            var x = d3.time.scale()
-                .range([0, width]).domain([new Date(chart.startTime * 1000), new Date(chart.endTime* 1000)]);//d3.extent(data[0], function (d) { return d.date; }));
+        var x = d3.time.scale()
+            .range([0, width]).domain([new Date(chart.startTime * 1000), new Date(chart.endTime * 1000)]);//d3.extent(data[0], function (d) { return d.date; }));
 
-            var y = d3.scale.linear()
-                .range([height, 0]).domain([
-                d3.min(data, function (c) { return d3.min(c, function (v) { return v.count; }); }),
-                d3.max(data, function (c) { return d3.max(c, function (v) { return v.count; }); })
-                ]);
+        var y = d3.scale.linear()
+            .range([height, 0]).domain([
+            d3.min(data, function (c) { return d3.min(c, function (v) { return v.count; }); }),
+            d3.max(data, function (c) { return d3.max(c, function (v) { return v.count; }); })
+            ]);
 
-            var xAxis = d3.svg.axis()
-                .scale(x)
-                .orient("bottom");
+        var xAxis = d3.svg.axis()
+            .scale(x)
+            .orient("bottom");
 
-            var yAxis = d3.svg.axis()
-                .scale(y)
-                .orient("left");
+        var yAxis = d3.svg.axis()
+            .scale(y)
+            .orient("left");
 
-            var line = d3.svg.line()
-                .interpolate("basis")
-                .x(function (d) { return x(d.date); })
-                .y(function (d) { return y(d.count); });
-
-
-
-            g.append("g")
-                .attr("class", "x axis")
-                .attr("transform", "translate(0," + height + ")")
-                .call(xAxis);
-
-            g.append("g")
-                .attr("class", "y axis")
-                .call(yAxis)
-              .append("text")
-                .attr("transform", "rotate(-90)")
-                .attr("y", 6)
-                .attr("dy", ".71em")
-                .style("text-anchor", "end")
-                .text("Total count");
-            g.append("clipPath").attr("id", "clipChart").append("rect").attr("x", 0).attr("y", 0).attr("width", 0).attr("height", height)
-                .transition().duration(2000).attr("width",width);
-
-            var totalsPaths = g.append("g").attr("id", "totalsPaths").selectAll(".contact")
-                .data(data)
-              .enter().append("g")
-                .attr("class", "contact").attr("clip-path", "url(#clipChart)");
-
-            totalsPaths.append("path")
-                .attr("class", "line")
-                .attr("d", function (d) {
-                    return line(d);
-                })
-                .style("stroke", function (d, i) {
-                    return chart.colors[toLabel[i]];
-                })
-            .style("fill", "none");
+        var line = d3.svg.line()
+            .interpolate("basis")
+            .x(function (d) { return x(d.date); })
+            .y(function (d) { return y(d.count); });
 
 
-            //city.append("text")
-            //    .datum(function (d) { return { name: d.name, value: d.values[d.values.length - 1] }; })
-            //    .attr("transform", function (d) { return "translate(" + x(d.value.date) + "," + y(d.value.temperature) + ")"; })
-            //    .attr("x", 3)
-            //    .attr("dy", ".35em")
-            //    .text(function (d) { return d.name; });
+
+        g.append("g")
+            .attr("class", "x axis")
+            .attr("transform", "translate(0," + height + ")")
+            .call(xAxis);
+
+        g.append("g")
+            .attr("class", "y axis")
+            .call(yAxis)
+          .append("text")
+            .attr("transform", "rotate(-90)")
+            .attr("y", 6)
+            .attr("dy", ".71em")
+            .style("text-anchor", "end")
+            .text("Total count");
+        g.append("clipPath").attr("id", "clipChart").append("rect").attr("x", 0).attr("y", 0).attr("width", 0).attr("height", height)
+            .transition().duration(2000).attr("width", width);
+
+        var totalsPaths = g.append("g").attr("id", "totalsPaths").selectAll(".contact")
+            .data(data)
+          .enter().append("g")
+            .attr("class", "contact").attr("clip-path", "url(#clipChart)");
+
+        totalsPaths.append("path")
+            .attr("class", "line")
+            .attr("d", function (d) {
+                return line(d);
+            })
+            .style("stroke", function (d, i) {
+                return chart.colors[toLabel[i]];
+            })
+        .style("fill", "none");
+
+
+        //city.append("text")
+        //    .datum(function (d) { return { name: d.name, value: d.values[d.values.length - 1] }; })
+        //    .attr("transform", function (d) { return "translate(" + x(d.value.date) + "," + y(d.value.temperature) + ")"; })
+        //    .attr("x", 3)
+        //    .attr("dy", ".35em")
+        //    .text(function (d) { return d.name; });
 
 
 
 
     };
 
-    WebChart.prototype.undraw_multichart= function () {
-        return d3.select("#totalschart").remove();
+    WebChart.prototype.undraw_multichart = function () {
+        return this.details.select("#totalschart").remove();
+
+    };
+
+    WebChart.prototype.undraw_barschart = function () {
+        return this.details.select("#barschart").remove();
     };
 
 
@@ -801,7 +835,7 @@ WebChart = (function () {
 
 
         paths
-            .on("mouseover", function (d) {          
+            .on("mouseover", function (d) {
                 if (this._listenToEvents) {
                     // Calculate angle bisector
                     var ang = d.startAngle + (d.endAngle - d.startAngle) / 2;
@@ -847,7 +881,7 @@ WebChart = (function () {
                         });
                 }
             })
-            .on("mouseout", function (d) {          
+            .on("mouseout", function (d) {
                 if (this._listenToEvents) {
                     d3.select(this).transition()
                     .duration(150).attr("transform", "scale(1,1)");
@@ -861,7 +895,7 @@ WebChart = (function () {
                     .style("font-weight", "normal");
                     chart.vis.select("#numberOfConnections").remove();
                 }
-            });     
+            });
 
         //Draw the unzoom button
         var button, button_text;
@@ -953,7 +987,7 @@ WebChart = (function () {
         }
         return this.tooltip.hideTooltip();
     };
-    
+
     WebChart.prototype.reset = function () {
         this.nodes = [];
         this.totalCyborgScore = 0;
@@ -1003,20 +1037,8 @@ WebChart = (function () {
         return points;
     };
 
-    WebChart.prototype.get_timeslot = function (timestamp) {
-        var date = new Date(timestamp);
-        if (date.getHours() < 8)
-            return DAYSLOT.MORNING;
-        else if (date.getHours() >= 8 && date.getHours() < 12)
-            return DAYSLOT.EARLYCLASS;
-        else if (date.getHours() >= 12 && date.getHours() < 13)
-            return DAYSLOT.LUNCH;
-        else if (date.getHours() >= 13 && date.getHours() < 17)
-            return DAYSLOT.LATECLASS;
-        else
-            return DAYSLOT.AFTER;
-    };
-       
+
+
     return WebChart;
 
 
@@ -1027,12 +1049,12 @@ var parseResponse = function (data) { return data; };
 root = typeof exports !== "undefined" && exports !== null ? exports : this;
 
 $(function () {
-    chart = null; 
+    chart = null;
 
-   chart = new WebChart(token);
-    timeline = new Timeline(token);    
-    screen = new LoadingScreen(1200/2, 750/2);
+    chart = new WebChart(token);
+    timeline = new Timeline(token);
+    screen = new LoadingScreen(1200 / 2, 750 / 2);
 
-    return screen.show_loading_screen();    
+    return screen.show_loading_screen();
 });
 
