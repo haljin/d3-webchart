@@ -340,7 +340,7 @@ WebChart = (function () {
 		        chart.zoom_help();
 		        help=true;
 		    }
-		    if (help == true)
+		   else if (help == true)
 		    {
 		        chart.unzoom_help();
 		        help = false;
