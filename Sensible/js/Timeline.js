@@ -49,7 +49,7 @@ Timeline = (function () {
                 return chart.colors[toLabel[i]];
             })
             .attr("class", "layer")
-            .attr("transform", function (d) { return "translate(" + "0,27)"; });
+            .attr("transform", function (d) { return "translate(" + "0,7)"; });
 
         var bars = layers.selectAll("g.bar")
             .data(function (d) { return d; })
@@ -87,25 +87,26 @@ Timeline = (function () {
 
         chart.svg.append("g")
             .attr("class", "x axis")
-            .attr("transform", "translate(0," + 130 + ")")
+            .attr("transform", "translate(0," + 110 + ")")
             .call(xAxis);
 
         chart.svg.append("g")
             .attr("class", "x brush")
             .call(brush)
           .selectAll("rect")
-            .attr("y", 20)
+            .attr("y", 5)
             .attr("height", 100 + 7);
 
         var label = chart.svg.append("svg:text")
         .attr("x", 500)
-        .attr("y", 10)
+        .attr("y", 5)
         .attr("text-anchor", "middle")
         .attr("id", "dates");
 
         function brushed() {
             label.text(brush.extent()[0].toDateString().split(" ")[1] + " " + brush.extent()[0].toDateString().split(" ")[2]
-                + "  -  " + brush.extent()[1].toDateString().split(" ")[1] + " " + brush.extent()[1].toDateString().split(" ")[2]);
+                + "  -  " + brush.extent()[1].toDateString().split(" ")[1] + " " + brush.extent()[1].toDateString().split(" ")[2])
+            .attr("transform", "translate(100," + 145 + ")");
         }
 
     };
