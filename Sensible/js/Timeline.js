@@ -8,7 +8,7 @@ Timeline = (function () {
         this.data = null;
         this.svg = null;
         this.colors = { call: "#b1f413", sms: "#ffd314", bt: "#7f1ac3" };
-        this.baseUrl = "http://localhost:5777/Sensible/data"
+        this.baseUrl = "http://localhost:5777/Sensible/data";
         this.load_data();
 
     };
