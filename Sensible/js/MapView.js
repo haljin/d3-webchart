@@ -150,7 +150,7 @@ MapView = (function () {
     };
 
     MapView.prototype.update_points =function () {
-        gleg.selectAll("circle")
+        this.gleg.selectAll("circle")
                     .attr("cx", function (d) {
                         return map.projection([d.lon, d.lat])[0];
                     })
