@@ -25,6 +25,8 @@ WebChart = (function () {
         this.levels = 3;
         this.points = this.getPoints((this.width - 100) / 3.5, this.segments, this.levels);
         this.radius_scale;
+        this.friendScales;
+        this.unusedScales = [];
 
         //Detailed view layour fields
         this.details = null;
@@ -34,6 +36,7 @@ WebChart = (function () {
         };
         this.zoomed_radius = 120;
         this.map = null;
+        this.bartype = 2;
 
         //Data fields
         this.token = token;
@@ -69,7 +72,8 @@ WebChart = (function () {
                 smsStat: 0,
                 btStat: 0,
                 friendshipScore: 0,
-                lastContact: 0
+                lastContact: 0,
+                friendScale: null
             }
         }
 
@@ -129,7 +133,7 @@ WebChart = (function () {
 
     };
 
-    WebChart.prototype.create_nodes = function () {
+    WebChart.prototype.create_nodes = function () {        
         var chart = this;
         var namesDict = {};
         //Helper functions to parse data and create data nodes
@@ -204,16 +208,31 @@ WebChart = (function () {
             })
         });
 
-        chart.update_vis();
+        chart.update_nodes();
+        screen.hide_loading_screen();
+        return chart.create_vis();
 
     };
 
-    WebChart.prototype.update_vis = function () {
+    WebChart.prototype.update_nodes = function () {
         var chart = this;
         var inWorkHours = function (timestamp) {
             var result = DataProcessor.get_timeslot(new Date(timestamp * 1000));
             return DAYSLOT.EARLYCLASS || DAYSLOT.LATECLASS;
         }
+        chart.nodes.forEach(function (d) {
+            d.callScore = d.smsScore = d.btScore = 0;
+            d.callStat = d.smsStat = d.btStat = 0;
+            d.friendshipScore = 0;
+            d.binsData = null;
+            d.totalsData = null;
+        });
+        chart.totalScore = 0;
+        chart.maxBtScore = 0;
+        chart.maxCallScore = 0;
+        chart.maxSmsScore = 0;
+        chart.maxFriendship = 0;
+        chart.minFriendship = 0;
 
         chart.nodes.forEach(function (d) {
             for (var i = 0; i < d.callData.length; i++) {
@@ -277,17 +296,29 @@ WebChart = (function () {
         chart.nodes.sort(function (a, b) {
             return b.value - a.value;
         });
+        for (var i = 16; i < chart.nodes.length; i++) {
+            if (chart.nodes[i].friendScale != null) {
+                chart.unusedScales.push(chart.nodes[i].friendScale);
+                chart.nodes[i].friendScale = null;
+            }
+        }
+
         chart.displayedNodes = chart.nodes.slice(0, 16);
         chart.displayedNodes.forEach(function (d) {
             d.radius = chart.radius_scale(d.value)
-            var parsed = DataProcessor.parse_totals_data(d.callData, d.smsData, d.btData);
+            var parsed = DataProcessor.parse_totals_data(d.callData, d.smsData, d.btData, chart.startTime, chart.endTime);
             d.totalsData = parsed.totals;
             d.binsData = parsed.bins;
+            if (d.friendScale == null) {
+                d.friendScale = chart.unusedScales.pop();
+            }
         });
-
-
-        screen.hide_loading_screen();
-        return chart.create_vis();
+        if (chart.zoomed) {
+            var d = chart.clicked;
+            var parsed = DataProcessor.parse_totals_data(d.callData, d.smsData, d.btData, chart.startTime, chart.endTime);
+            d.totalsData = parsed.totals;
+            d.binsData = parsed.bins;
+        }
     };
 
     WebChart.prototype.create_vis = function () {
@@ -316,8 +347,6 @@ WebChart = (function () {
         this.circles = this.web.selectAll("circle").data(this.displayedNodes, function (d) {
             return d.id;
         });
-
-
         this.web.attr("transform", "translate(" + chart.center.x + ", " + (chart.center.y) + ")").on("click", function (d, i) {
             if (!chart.inTransition)
                 if (chart.zoomed) {
@@ -325,7 +354,7 @@ WebChart = (function () {
                     return chart.unzoom_circle();
                 }
         });
-
+        this.web.append("rect").attr("x", -400).attr("y", -400).attr("height", 800).attr("width", 800).style("fill", "#ffffff");
 
         //dookola  
         for (level = 0; level < chart.levels; level++) {
@@ -350,7 +379,6 @@ WebChart = (function () {
                 .style("stroke", "#055");
             }
         }
-
         //wysokosc
         for (segment = 0; segment < chart.segments; segment++) {
             console.debug(chart.points.bySegment[segment]);
@@ -369,18 +397,21 @@ WebChart = (function () {
             .attr("width", 120)
             .attr("height", 200);
 
-
-
         var getPoints = function () {
             var result = [];
             for (var i = 0 ; i < chart.segments ; i++)
-                result.push(d3.scale.linear().domain([chart.minFriendship, chart.maxFriendship]).range([chart.points.byLevel[chart.levels - 1][i], chart.points.byLevel[0][i]]));
+                result.push({
+                    scale: d3.scale.linear().domain([chart.minFriendship, chart.maxFriendship]).range([chart.points.byLevel[chart.levels - 1][i], chart.points.byLevel[0][i]]),
+                    pointa: chart.points.byLevel[chart.levels - 1][i], pointb: chart.points.byLevel[0][i]
+                });
             return result;
         };
         var friendScale = d3.scale.linear().range([0, chart.maxFriendship]);
-        var points = getPoints();
-        points.randomize();
-
+        chart.friendScales = getPoints();
+        chart.friendScales.randomize();
+        this.displayedNodes.forEach(function (d, i) {
+            d.friendScale = chart.friendScales[i];
+        });
         this.circles.enter().append("circle")
             .attr("r", 0)
             .attr("fill", function (d) {
@@ -391,12 +422,12 @@ WebChart = (function () {
             }).attr("id", function (d) {
                 return "bubble_" + d.id;
             }).attr("cx", function (d, i) {
-                d.x = points[i](chart.minFriendship).x
-                return points[i](chart.minFriendship).x;
+                d.x = d.friendScale.scale(chart.minFriendship).x
+                return d.friendScale.scale(chart.minFriendship).x;
             })
             .attr("cy", function (d, i) {
-                d.y = points[i](chart.minFriendship).y
-                return points[i](chart.minFriendship).y;
+                d.y = d.friendScale.scale(chart.minFriendship).y
+                return d.friendScale.scale(chart.minFriendship).y;
             })
             .on("mouseover", function (d, i) {
                 return chart.show_details(d, i, this);
@@ -410,21 +441,124 @@ WebChart = (function () {
                 }
             });
 
-
-
-
-        return this.circles.transition().duration(500).attr("r", function (d) { 
+        return this.circles.transition().duration(500).attr("r", function (d) {
             return d.radius;
         }).each("end", function () {
             chart.circles.transition().duration(500).attr("cx", function (d, i) {
-                d.x = points[i](d.friendshipScore).x
-                return points[i](d.friendshipScore).x;
+                d.x = d.friendScale.scale(d.friendshipScore).x
+                return d.friendScale.scale(d.friendshipScore).x;
             })
             .attr("cy", function (d, i) {
-                d.y = points[i](d.friendshipScore).y
-                return points[i](d.friendshipScore).y;
+                d.y = d.friendScale.scale(d.friendshipScore).y
+                return d.friendScale.scale(d.friendshipScore).y;
             });
         });
+    };
+
+    WebChart.prototype.update_vis = function () {
+        var chart = this;
+        var oldtotals = this.clicked.totalsData;
+        this.update_nodes();
+        this.friendScales.forEach(function (d) {
+            d.scale = d3.scale.linear().domain([chart.minFriendship, chart.maxFriendship]).range([d.pointa, d.pointb]);
+        });
+        this.circles = this.web.selectAll("circle").data(chart.displayedNodes, function (d) {
+            return d.id;
+        });
+        //var change = this.circles.enter();
+        this.circles.exit().transition().duration(500).attr("r", 0).remove();
+
+        chart.circles.enter().append("circle")
+            .attr("r", 0)
+            .attr("fill", function (d) {
+                return chart.colors[d.group];
+            })
+            .attr("stroke-width", 2).attr("stroke", function (d) {
+                return d3.rgb(chart.colors[d.group]).darker();
+            }).attr("id", function (d) {
+                return "bubble_" + d.id;
+            }).attr("cx", function (d, i) {
+                d.x = d.friendScale.scale(chart.minFriendship).x
+                return d.friendScale.scale(chart.minFriendship).x;
+            })
+            .attr("cy", function (d, i) {
+                d.y = d.friendScale.scale(chart.minFriendship).y
+                return d.friendScale.scale(chart.minFriendship).y;
+            })
+            .on("mouseover", function (d, i) {
+                return chart.show_details(d, i, this);
+            }).on("mouseout", function (d, i) {
+                return chart.hide_details(d, i, this);
+            }).on("click", function (d, i) {
+                if (!chart.inTransition && !chart.zoomed) {
+                    chart.inTransition = true;
+                    chart.hide_details(d, i, this);
+                    return chart.zoom_circle(d);
+                }
+            });
+
+        chart.circles.transition().duration(500).attr("r", function (d) {
+            return d.radius;
+        }).each("end", function () {
+            chart.circles.transition().duration(500).attr("cx", function (d) {
+                d.x = d.friendScale.scale(d.friendshipScore).x
+                return d.friendScale.scale(d.friendshipScore).x;
+            })
+            .attr("cy", function (d) {
+                d.y = d.friendScale.scale(d.friendshipScore).y
+                return d.friendScale.scale(d.friendshipScore).y;
+            })
+            .attr("fill", function (d) {
+                if (chart.zoomed)
+                    return d3.rgb(chart.colors[d.group]).darker().darker().darker();
+                else
+                    return chart.colors[d.group];
+            })
+                .attr("stroke", function (d) {
+                    return d3.rgb(chart.colors[d.group]).darker();
+                });
+        });
+
+        if (this.zoomed) {
+            //Update pie chart
+            this.update_pie_chart();
+            this.update_barschart();
+            this.undraw_multichart();
+            this.draw_multichart(chart.clicked);
+            this.map.undraw_points();
+            this.details.append("g").attr("id", "map");
+            this.map.draw_points(this.startTime, this.endTime);
+            chart.details.select("#numberOfConnectionsCall")
+                           .text(function () {
+                               var content = "";
+                               var rest;
+                               var hours = Math.floor(chart.clicked.callStat / 3600);
+                               rest = chart.clicked.callStat % 3600;
+                               var minutes = Math.floor(rest / 60);
+                               rest = rest % 60;
+                               content += hours;
+                               if (minutes < 10)
+                                   content += ":0" + minutes;
+                               else
+                                   content += ":" + minutes;
+                               if (rest < 10)
+                                   content += ":0" + rest + " time in call";
+                               else
+                                   content += ":" + rest + " time in call";
+                               return content;
+                           });
+
+            chart.details.select("#numberOfConnectionsSms")
+                .text(function () {
+                    return chart.clicked.smsStat + " messages";
+                });
+
+            chart.details.select("#numberOfConnectionsBt")
+             .style("font-variant", "small-caps")
+             .text(function () {
+                 return chart.clicked.btStat + " connections";
+             });
+        }
     };
 
     WebChart.prototype.zoom_circle = function (d) {
@@ -481,7 +615,7 @@ WebChart = (function () {
         var other_circles = this.circles;
         var new_circle = this.vis.selectAll("#circle-zoomed");
 
-        map.undraw_map();
+        this.map.undraw_map();
         chart.undraw_barschart();
         chart.undraw_multichart();
 
@@ -522,19 +656,20 @@ WebChart = (function () {
     };
 
     WebChart.prototype.draw_details = function (d) {
-        map = new MapView(d);
+        this.map = new MapView(d);
 
         this.details.append("g").attr("id", "map");
 
 
-        map.draw_map(chart.token);
+        this.map.draw_map(this.token, this.startTime, this.endTime);
         this.draw_multichart(d);
-        this.draw_barschart(d,2);
+        this.draw_barschart(d);
         this.draw_pie_chart(d);
     };
 
-    WebChart.prototype.draw_barschart = function (d, type) {
+    WebChart.prototype.draw_barschart = function (d) {
         var chart = this;
+        var type = chart.bartype;
         var g = chart.details.append("g").attr("id", "barschart").attr("transform", "translate(595,500)");
         var width = 600,
             height = 200;
@@ -568,7 +703,7 @@ WebChart = (function () {
         var hourNames = ["00:00-08:00", "08:00-12:00", "12:00-13:00", "13:00-17:00", "17:00-00:00"];
         x0.domain(data[type].map(function (d) { return d.day; }));
         x1.domain(hourNames).rangeRoundBands([0, x0.rangeBand()]);//buckets
-        y.domain([0, d3.max(data[type], function (d) { return d3.max(d.slots, function (v) { return v.count; }); })]);
+        y.domain([0, 1]);// d3.max(data[type], function (d) { return d3.max(d.slots, function (v) { return v.count; }); })]);
 
         g.append("g")
         .attr("class", "x axis")
@@ -585,13 +720,13 @@ WebChart = (function () {
             .style("text-anchor", "end")
             .text("Population");
 
-        var state = g.selectAll(".state")
+        var day = g.selectAll(".day")
             .data(data[type])
           .enter().append("g")
-            .attr("class", "g")
+            .attr("class", "day")
             .attr("transform", function (d) { return "translate(" + x0(d.day) + ",0)"; });
 
-        state.selectAll("rect")
+        day.selectAll("rect")
             .data(function (d) { return d.slots; })
           .enter().append("rect")
             .attr("width", x1.rangeBand())
@@ -614,7 +749,7 @@ WebChart = (function () {
             .attr("x", width - 18)
             .attr("width", 18)
             .attr("height", 18)
-            .style("fill",  colors );
+            .style("fill", colors);
 
         legend.append("text")
             .attr("x", width - 24)
@@ -628,12 +763,13 @@ WebChart = (function () {
             .attr("class", "barbutton")
             .on("mouseover", function (d) { d3.select(this).select("rect").style("stroke-width", "1px").style("stroke", "#000000"); })
             .on("mouseout", function (d) { d3.select(this).select("rect").style("stroke-width", "0px").style("stroke", "none") })
-            .on("click", function (x, i) { 
+            .on("click", function (x, i) {
                 if (i != type) {
                     chart.undraw_barschart();
-                    chart.draw_barschart(d, i);
+                    chart.bartype = i;
+                    chart.draw_barschart(d);
                 }
-                });
+            });
 
         buttons.append("rect")
             .attr("x", function (d, i) { return -5 + i * 40; })
@@ -656,26 +792,40 @@ WebChart = (function () {
             .attr("stroke", function (d, i) {
                 return chart.colors[toLabel[i]];
             })
-            .attr("class", "symbol")
             .style("stroke-width", "2px")
            .style("fill", "none")
             .attr("points", function (d, i) {
                 return chart.shapes[toLabel[i]];
             });
+    };
 
+    WebChart.prototype.update_barschart = function () {
+        var chart = this;
+        var data = chart.clicked.binsData;
+        var height = 200;
+        var y = d3.scale.linear()
+            .range([height, 0]);
 
+        chart.details.select("#barschart").selectAll(".day")
+            .data(data[chart.bartype])
+            .selectAll("rect")
+            .data(function (d) { return d.slots; })
+            .transition().duration(750)
+        .attr("height", function (d) { return height - y(d.count); })
+        .attr("y", function (d) {
+            return y(d.count);
+        });
+    };
 
-
+    WebChart.prototype.undraw_barschart = function () {
+        return this.details.select("#barschart").remove();
     };
 
     WebChart.prototype.draw_multichart = function (d) {
         var chart = this;
         var g = chart.details.append("g").attr("id", "totalschart").attr("transform", "translate(595,100)");
         var toLabel = ["call", "sms", "bt"];
-        
-
         var data = d.totalsData;
-
         var width = 600,
         height = 200;
 
@@ -700,8 +850,6 @@ WebChart = (function () {
             .interpolate("basis")
             .x(function (d) { return x(d.date); })
             .y(function (d) { return y(d.count); });
-
-
 
         g.append("g")
             .attr("class", "x axis")
@@ -733,35 +881,56 @@ WebChart = (function () {
             .style("stroke", function (d, i) {
                 return chart.colors[toLabel[i]];
             })
-        .style("fill", "none");
+            .style("fill", "none");
+    };
+
+    WebChart.prototype.update_multichart = function (olddata) {
+        var chart = this;
+        var data = chart.clicked.totalsData;
+        var width = 600,
+        height = 200;
+
+        var x = d3.time.scale()
+            .range([0, width]).domain([new Date(chart.startTime * 1000), new Date(chart.endTime * 1000)]);//d3.extent(data[0], function (d) { return d.date; }));
+
+        var y = d3.scale.linear()
+            .range([height, 0]).domain([
+            d3.min(data, function (c) { return d3.min(c, function (v) { return v.count; }); }),
+            d3.max(data, function (c) { return d3.max(c, function (v) { return v.count; }); })
+            ]);
+
+        var xAxis = d3.svg.axis()
+            .scale(x)
+            .orient("bottom");
+
+        var yAxis = d3.svg.axis()
+            .scale(y)
+            .orient("left");
+
+        var line = d3.svg.line()
+            .interpolate("basis")
+            .x(function (d) { return x(d.date); })
+            .y(function (d) { return y(d.count); });
 
 
-        //city.append("text")
-        //    .datum(function (d) { return { name: d.name, value: d.values[d.values.length - 1] }; })
-        //    .attr("transform", function (d) { return "translate(" + x(d.value.date) + "," + y(d.value.temperature) + ")"; })
-        //    .attr("x", 3)
-        //    .attr("dy", ".35em")
-        //    .text(function (d) { return d.name; });
-
-
-
-
+        var paths = chart.details.select("#totalsPaths").selectAll(".contact").data(data).selectAll(".line").transition().duration(750)
+        .attrTween("d", function (data, i) {
+            var interpolation = d3.interpolate(olddata[i], data);
+            //this._current = interpolation(0);
+            return function (t) {
+                return line(interpolation(t));
+            };
+        });
     };
 
     WebChart.prototype.undraw_multichart = function () {
         return this.details.select("#totalschart").remove();
-
     };
-
-    WebChart.prototype.undraw_barschart = function () {
-        return this.details.select("#barschart").remove();
-    };
-
 
     WebChart.prototype.draw_pie_chart = function (d) {
         var chart = this;
         var data = [{ value: d.callScore, label: "Calls" }, { value: d.smsScore, label: "Sms" }, { value: d.btScore, label: "Bluetooth" }];
-
+        if (d.value == 0) data = [{ value: 1, label: "Calls" }, { value: 1, label: "Sms" }, { value: 1, label: "Bluetooth" }];
         var arc = d3.svg.arc()
             .outerRadius(chart.zoomed_radius)
             .innerRadius(chart.zoomed_radius - 40);
@@ -818,7 +987,6 @@ WebChart = (function () {
                 return chart.shapes[toLabel[i]];
             });
 
-
         var paths = g.selectAll("path");
         var text_scale = d3.scale.pow().domain([33, 50]).range([50, 30]).clamp(true);
 
@@ -838,8 +1006,6 @@ WebChart = (function () {
             .style("font-variant", "small-caps")
             .text(function () { return chart.clicked.name; })
             .style("font-size", text_scale(chart.clicked.name.length));
-
-
 
         chart.details.append("text")
                        .attr("x", 410)
@@ -865,31 +1031,29 @@ WebChart = (function () {
                            else
                                content += ":" + rest + " time in call";
                            return content;
-                           chart.clicked.smsStat + " messages";
-                           chart.clicked.btStat + " connections";
                        });
 
-                chart.details.append("text")
-                    .attr("x", 410)
-                    .attr("id", "numberOfConnectionsSms")
-                    .attr("y", 220)
-                    .style("font-family", "Segoe UI")
-                    .style("font-size", "15px")
-                    .style("font-variant", "small-caps")
-                    .text(function () {
-                        return chart.clicked.smsStat + " messages";   
-                    });
+        chart.details.append("text")
+            .attr("x", 410)
+            .attr("id", "numberOfConnectionsSms")
+            .attr("y", 220)
+            .style("font-family", "Segoe UI")
+            .style("font-size", "15px")
+            .style("font-variant", "small-caps")
+            .text(function () {
+                return chart.clicked.smsStat + " messages";
+            });
 
-                chart.details.append("text")
-                 .attr("x", 410)
-                 .attr("id", "numberOfConnectionsBt")
-                 .attr("y", 240)
-                 .style("font-family", "Segoe UI")
-                 .style("font-size", "15px")
-                 .style("font-variant", "small-caps")
-                 .text(function () {
-                     return chart.clicked.btStat + " connections";
-                 });
+        chart.details.append("text")
+         .attr("x", 410)
+         .attr("id", "numberOfConnectionsBt")
+         .attr("y", 240)
+         .style("font-family", "Segoe UI")
+         .style("font-size", "15px")
+         .style("font-variant", "small-caps")
+         .text(function () {
+             return chart.clicked.btStat + " connections";
+         });
 
         paths
             .on("mouseover", function (d) {
@@ -898,7 +1062,6 @@ WebChart = (function () {
                     var ang = d.startAngle + (d.endAngle - d.startAngle) / 2;
                     // Transformate to SVG space
                     ang = (ang - (Math.PI / 2)) * -1;
-
                     d3.select(this).transition()
                         .duration(150).attr("transform", "scale(1.2,1.2)");
                     chart.details.selectAll(".symbol").transition().duration(150).attr("transform", function (d) {
@@ -910,9 +1073,6 @@ WebChart = (function () {
                         chart.details.select("#numberOfConnectionsSms").style("font-weight", "bold");
                     else if (d.data.label == "Bluetooth")
                         chart.details.select("#numberOfConnectionsBt").style("font-weight", "bold");
-
-
-
                 }
             })
             .on("mouseout", function (d) {
@@ -927,14 +1087,9 @@ WebChart = (function () {
                     .attr("stroke-width", 1)
                     .attr("r", 5)
                     .style("font-weight", "normal");
-
-                    
                     chart.details.select("#numberOfConnectionsCall").style("font-weight", "normal");
-                    
                     chart.details.select("#numberOfConnectionsSms").style("font-weight", "normal");
-                    
                     chart.details.select("#numberOfConnectionsBt").style("font-weight", "normal");
-                   
                 }
             });
 
@@ -972,7 +1127,32 @@ WebChart = (function () {
 		.text("x");
     };
 
+    WebChart.prototype.update_pie_chart = function () {
+        var chart = this;
+        var newpie = [{ value: chart.clicked.callScore, label: "Calls" }, { value: chart.clicked.smsScore, label: "Sms" }, { value: chart.clicked.btScore, label: "Bluetooth" }];
+        if (chart.clicked.value == 0) newpie = [{ value: 1, label: "Calls" }, { value: 1, label: "Sms" }, { value: 1, label: "Bluetooth" }];
+        var pie = d3.layout.pie()
+       .sort(null)
+       .value(function (d) { return d.value; });
+
+        var arc = d3.svg.arc()
+        .outerRadius(chart.zoomed_radius)
+        .innerRadius(chart.zoomed_radius - 40);
+
+        chart.vis.selectAll("#piechart").data(pie(newpie)).transition()
+        .duration(500)
+        .attrTween("d", function (data) {
+            var interpolation = d3.interpolate(this._current, data);
+            this._current = interpolation(0);
+            return function (t) {
+                return arc(interpolation(t));
+            };
+        })
+
+    };
+
     WebChart.prototype.undraw_pie_chart = function () {
+        var chart = this;
         var arc = d3.svg.arc()
 		.outerRadius(chart.zoomed_radius)
 		.innerRadius(chart.zoomed_radius - 40);
@@ -1015,6 +1195,8 @@ WebChart = (function () {
 
             content += "<span class=\"name\">Sms: </span><span class=\"value\">" + data.smsStat + " messages.</span><br/>";
             content += "<span class=\"name\">Bluetooth: </span><span class=\"value\">" + data.btStat + " connections.</span><br/>";
+            content += "<span class=\"name\">FScore: </span><span class=\"value\">" + data.friendshipScore + " </span><br/>";
+            content += "<span class=\"name\">Index: </span><span class=\"value\">" + i + " </span><br/>";
             return this.tooltip.showTooltip(content, d3.event);
         }
     };
@@ -1027,16 +1209,6 @@ WebChart = (function () {
             });
         }
         return this.tooltip.hideTooltip();
-    };
-
-    WebChart.prototype.reset = function () {
-        this.nodes = [];
-        this.totalCyborgScore = 0;
-        this.totalCavemanScore = 0;
-        this.zoomed = false;
-        this.clicked = null;
-        this.mode = 0;
-        this.inTransition = false;
     };
 
     //Auxiliary functions
@@ -1078,11 +1250,7 @@ WebChart = (function () {
         return points;
     };
 
-
-
     return WebChart;
-
-
 })();
 
 var parseResponse = function (data) { return data; };
@@ -1090,9 +1258,9 @@ var parseResponse = function (data) { return data; };
 root = typeof exports !== "undefined" && exports !== null ? exports : this;
 
 $(function () {
-    chart = null;
+    webchart = null;
 
-    chart = new WebChart(token);
+    webchart = new WebChart(token);
     timeline = new Timeline(token);
     screen = new LoadingScreen(1200 / 2, 750 / 2);
 
