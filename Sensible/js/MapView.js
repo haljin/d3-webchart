@@ -147,6 +147,16 @@ MapView = (function () {
     MapView.prototype.undraw_points = function () {
         var map = this;
         map.gleg.selectAll("circle").remove();
+        map.points = null;
+
+        map.g.append("text")
+               .attr("id", "maploading")
+               .attr("x", 200)
+               .attr("y", 600)
+               .style("font-family", "Segoe UI")
+               .style("font-variant", "small-caps")
+               .style("font-size", "24px")
+               .text("Loading...");
     };
 
     MapView.prototype.update_points =function () {
