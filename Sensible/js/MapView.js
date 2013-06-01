@@ -93,13 +93,12 @@ MapView = (function () {
                 .style("font-family", "Segoe UI")
                 .style("font-variant", "small-caps")
                 .style("font-size", "24px")
-                .text("Loading...");
-          
+                .text("Loading...");          
         });
 
         var zoom = d3.behavior.zoom()
            .on("zoom", function () {
-               this.g.attr("transform", "translate(" +
+               map.g.attr("transform", "translate(" +
                    d3.event.translate.join(",") + ")");
                //map.projection.translate([-8500 + d3.event.translate[0], 2000 + d3.event.translate[1]]);
 
