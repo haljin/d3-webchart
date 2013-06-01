@@ -327,6 +327,53 @@ WebChart = (function () {
         });
 
 
+
+        //Draw the unzoom button
+        var button,
+            button_text,
+            help = false;
+        var group = this.details.append("g")
+        .attr("id", "button-help")
+		.on("click", function () {
+		    if(help==false)
+		    {
+		        chart.zoom_help();
+		        help=true;
+		    }
+		    if (help == true)
+		    {
+		        chart.unzoom_help();
+		        help = false;
+            }
+		})
+		.on("mouseover", function () {
+		    button.attr("fill", "#B1B1B1");
+		})
+		.on("mouseout", function () {
+		    button.attr("fill", "#dddddd");
+		});
+
+        button = group.append("rect")
+            .attr("x", chart.width - 30)
+            .attr("y", 10)
+            .attr("width", 30)
+            .attr("height", 30)
+            .attr("fill", "#dddddd")
+            .attr("stroke", "#aaaaaa")
+            .attr("stroke-width", 0.25);
+
+        button_text = group.append("text")
+		.attr("x", chart.width - 20)
+		.attr("y", 30)
+		.style("cursor", "hand")
+		.style("font-family", "Segoe UI")
+		.style("font-size", "20px")
+		.style("font-variant", "small-caps")
+		.style("font-weight", "bold")
+		.text("?");
+    
+
+
         //dookola  
         for (level = 0; level < chart.levels; level++) {
             for (j = 0; j < chart.segments; j++) {
@@ -426,6 +473,34 @@ WebChart = (function () {
             });
         });
     };
+    WebChart.prototype.zoom_help = function (d) {
+        var chart = this;
+        chart.zoomed = true;
+        this.clicked = d;
+        
+        //Zoom out the rest of the visualization
+        this.web.transition().duration(1000)
+        .attr("transform", function (d) {
+            return "translate(70,50) scale(0.15)";
+        });
+
+    };
+
+
+
+    WebChart.prototype.unzoom_help = function () {
+        var chart = this;
+         
+        this.web.transition().duration(1000)
+        .attr("transform", function (d) {
+            return "translate(" + chart.center.x + ", " + (chart.center.y) + ") scale(1)";
+        });
+
+       
+        
+
+    };
+
 
     WebChart.prototype.zoom_circle = function (d) {
         var chart = this;
@@ -535,7 +610,7 @@ WebChart = (function () {
 
     WebChart.prototype.draw_barschart = function (d, type) {
         var chart = this;
-        var g = chart.details.append("g").attr("id", "barschart").attr("transform", "translate(595,500)");
+        var g = chart.details.append("g").attr("id", "barschart").attr("transform", "translate(565,460)");//**
         var width = 600,
             height = 200;
         var data = d.binsData;
@@ -554,8 +629,8 @@ WebChart = (function () {
             .range([height, 0]);
         var color = chart.colors[toLabel[type]];
         var colors = d3.scale.ordinal()
-            .range([d3.rgb(color).darker().darker(), d3.rgb(color).darker(),
-                color, d3.rgb(color).brighter(), d3.rgb(color).brighter().brighter()]);
+            .range([d3.rgb(color).darker().darker().darker(), d3.rgb(color).darker().darker(),
+                d3.rgb(color).darker(),color, d3.rgb(color).brighter(0.8)]);
 
         var xAxis = d3.svg.axis()
             .scale(x0)
@@ -576,6 +651,13 @@ WebChart = (function () {
             .call(xAxis);
 
         g.append("g")
+        .attr("class", "Label name")
+          .append("text")
+            .attr("y", -6)
+            .attr("x",230)
+            .text("Comunication by time of day").attr("font-weight","bold");
+
+        g.append("g")
         .attr("class", "y axis")
             .call(yAxis)
           .append("text")
@@ -583,7 +665,7 @@ WebChart = (function () {
             .attr("y", 6)
             .attr("dy", ".71em")
             .style("text-anchor", "end")
-            .text("Population");
+            .text("Propability");
 
         var state = g.selectAll(".state")
             .data(data[type])
@@ -596,19 +678,20 @@ WebChart = (function () {
           .enter().append("rect")
             .attr("width", x1.rangeBand())
             .attr("x", function (d) { return x1(d.time); })
-            .attr("y", function (d) {
-                return y(d.count);
-            })
-            .attr("height", function (d) {
-                return height - y(d.count);
-            })
-            .style("fill", function (d) { return colors(d.time); });
+            .attr("y", height)
+            .attr("height","0")
+            .style("fill", function (d) { return colors(d.time); }).transition().duration(750)
+      .delay(0)
+      .attr("height", function (d) { return height - y(d.count); })
+        .attr("y", function (d) {
+            return y(d.count);
+        });
 
         var legend = g.selectAll(".legend")
-            .data(hourNames.slice().reverse())
+            .data(hourNames.slice())
           .enter().append("g")
             .attr("class", "legend")
-            .attr("transform", function (d, i) { return "translate(0," + i * 20 + ")"; });
+            .attr("transform", function (d, i) { return "translate(" + (-450+i * 100) + ",230)"; });//**
 
         legend.append("rect")
             .attr("x", width - 18)
@@ -626,37 +709,42 @@ WebChart = (function () {
         var buttons = g.selectAll(".barbutton").data([0, 1, 2]).enter()
             .append("g")
             .attr("class", "barbutton")
-            .on("mouseover", function (d) { d3.select(this).select("rect").style("stroke-width", "1px").style("stroke", "#000000"); })
-            .on("mouseout", function (d) { d3.select(this).select("rect").style("stroke-width", "0px").style("stroke", "none") })
-            .on("click", function (x, i) { 
-                if (i != type) {
+            .on("mouseover", function (d) {
+                d3.select(this).select("polyline").style("stroke-width", "3px");
+                d3.select(this).select("rect").style("stroke-width", "1px").style("fill", "#dddddd");
+            })
+            .on("mouseout", function (d) {
+                d3.select(this).select("polyline").style("stroke-width", "2px");
+                d3.select(this).select("rect").style("stroke-width", "0px").style("fill",
+                    function (d) { if (d == type) return "#eeeeee"; else return "#ffffff" });
+            })
+            .on("click", function (x) { 
+                if (x != type) {
                     chart.undraw_barschart();
-                    chart.draw_barschart(d, i);
+                    chart.draw_barschart(d, x);
                 }
                 });
 
         buttons.append("rect")
-            .attr("x", function (d, i) { return -5 + i * 40; })
-            .attr("y", -102)
-            .attr("width", 30)
-            .attr("height", 30)
-            .attr("fill", "#ffffff")
-            .style("fill", function (d, i) { if (i == type) return "#eeeeee"; else return "none"; });
+            .attr("x",601 )
+            .attr("y", function (d, i) { return 36+ i * 37; })
+            .attr("width", 31)
+            .attr("height", 31)
+            .style("fill", function (d) { if (d == type) return "#eeeeee"; else return "#ffffff"; });
         buttons.append("polyline")
             .attr("transform", function (d, i) {
                 switch (i) {
                     case 0:
-                        return "translate(0, -100)";
+                        return "translate(605, 40)";
                     case 1:
-                        return "translate(38, -95)";
+                        return "translate(605, 80)";
                     case 2:
-                        return "translate(80, -95)";
+                        return "translate(609, 115)";
                 }
             })
             .attr("stroke", function (d, i) {
                 return chart.colors[toLabel[i]];
             })
-            .attr("class", "symbol")
             .style("stroke-width", "2px")
            .style("fill", "none")
             .attr("points", function (d, i) {
@@ -670,7 +758,7 @@ WebChart = (function () {
 
     WebChart.prototype.draw_multichart = function (d) {
         var chart = this;
-        var g = chart.details.append("g").attr("id", "totalschart").attr("transform", "translate(595,100)");
+        var g = chart.details.append("g").attr("id", "totalschart").attr("transform", "translate(565,170)");//**
         var toLabel = ["call", "sms", "bt"];
         
 
@@ -702,6 +790,13 @@ WebChart = (function () {
             .y(function (d) { return y(d.count); });
 
 
+        g.append("g")
+       .attr("class", "Label name")
+         .append("text")
+           .attr("y", -6)
+           .attr("x", 235)
+           .text("Amount of connection").attr("font-weight", "bold");
+
 
         g.append("g")
             .attr("class", "x axis")
@@ -718,7 +813,7 @@ WebChart = (function () {
             .style("text-anchor", "end")
             .text("Total count");
         g.append("clipPath").attr("id", "clipChart").append("rect").attr("x", 0).attr("y", 0).attr("width", 0).attr("height", height)
-            .transition().duration(2000).attr("width", width);
+            .transition().duration(1000).attr("width", width);
 
         var totalsPaths = g.append("g").attr("id", "totalsPaths").selectAll(".contact")
             .data(data)
@@ -733,6 +828,7 @@ WebChart = (function () {
             .style("stroke", function (d, i) {
                 return chart.colors[toLabel[i]];
             })
+        .style("stroke-width", "2px")//--
         .style("fill", "none");
 
 
@@ -842,9 +938,9 @@ WebChart = (function () {
 
 
         chart.details.append("text")
-                       .attr("x", 410)
+                       .attr("x", function (d) { return (400 + (chart.clicked.name.length * 18) / 2) - 150; })
                        .attr("id", "numberOfConnectionsCall")
-                       .attr("y", 200)
+                       .attr("y", 80)
                        .style("font-family", "Segoe UI")
                        .style("font-size", "15px")
                        .style("font-variant", "small-caps")
@@ -865,14 +961,13 @@ WebChart = (function () {
                            else
                                content += ":" + rest + " time in call";
                            return content;
-                           chart.clicked.smsStat + " messages";
-                           chart.clicked.btStat + " connections";
+                           
                        });
 
                 chart.details.append("text")
-                    .attr("x", 410)
+                    .attr("x", function (d) { return (400 + (chart.clicked.name.length * 18) / 2); })
                     .attr("id", "numberOfConnectionsSms")
-                    .attr("y", 220)
+                    .attr("y", 80)
                     .style("font-family", "Segoe UI")
                     .style("font-size", "15px")
                     .style("font-variant", "small-caps")
@@ -881,9 +976,9 @@ WebChart = (function () {
                     });
 
                 chart.details.append("text")
-                 .attr("x", 410)
+                 .attr("x", function (d) { return (400 + (chart.clicked.name.length * 18) / 2) +100; })
                  .attr("id", "numberOfConnectionsBt")
-                 .attr("y", 240)
+                 .attr("y", 80)
                  .style("font-family", "Segoe UI")
                  .style("font-size", "15px")
                  .style("font-variant", "small-caps")
