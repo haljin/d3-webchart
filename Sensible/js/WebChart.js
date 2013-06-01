@@ -532,7 +532,8 @@ WebChart = (function () {
 
     WebChart.prototype.update_vis = function () {
         var chart = this;
-        var oldtotals = this.clicked.totalsData;
+        if(chart.zoomed)
+            var oldtotals = this.clicked.totalsData;
         this.update_nodes();
         this.friendScales.forEach(function (d) {
             d.scale = d3.scale.linear().domain([chart.minFriendship, chart.maxFriendship]).range([d.pointa, d.pointb]);
@@ -602,7 +603,9 @@ WebChart = (function () {
             this.draw_multichart(chart.clicked);
             this.map.undraw_points();
             this.details.append("g").attr("id", "map");
-            setTimeout(function () { chart.map.draw_points(this.startTime, this.endTime); }, 2500);
+            setTimeout(function () {
+                chart.map.draw_points(chart.startTime, chart.endTime);
+            }, 2500);
             chart.details.select("#numberOfConnectionsCall")
                            .text(function () {
                                var content = "";
