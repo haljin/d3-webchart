@@ -6,7 +6,7 @@ DataProcessor = (function () {
 
     };
 
-    DataProcessor.parse_totals_data = function (cdata, sdata, bdata) {
+    DataProcessor.parse_totals_data = function (cdata, sdata, bdata, start, end) {
         var maxes = [0, 0, 0];
         var binData = function (timestamp, type) {
             var date = new Date(timestamp * 1000);
@@ -36,41 +36,50 @@ DataProcessor = (function () {
         var bins = genTables();
                
 
-        cdata.forEach(function (d) {
-            var found = false;
-            var newDate = new Date(d.timestamp * 1000);
-            var lastElem = results[0][results[0].length - 1];
-            binData(d.timestamp, 0);
-            if (lastElem && lastElem.date.toLocaleDateString() == newDate.toLocaleDateString()) {
-                lastElem.count += 1;
+        for(var i = 0; i < cdata.length; i++) {
+            if (cdata[i].timestamp > end) break;
+            if (cdata[i].timestamp > start) {
+                var found = false;
+                var newDate = new Date(cdata[i].timestamp * 1000);
+                var lastElem = results[0][results[0].length - 1];
+                binData(cdata[i].timestamp, 0);
+                if (lastElem && lastElem.date.toLocaleDateString() == newDate.toLocaleDateString()) {
+                    lastElem.count += 1;
+                }
+                else
+                    results[0].push({ date: newDate, count: 1 });
             }
-            else
-                results[0].push({ date: newDate, count: 1 });
-        });
+        };
 
-        sdata.forEach(function (d) {
-            var found = false;
-            var newDate = new Date(d.timestamp * 1000);
-            var lastElem = results[1][results[1].length - 1];
-            binData(d.timestamp, 1);
-            if (lastElem && lastElem.date.toLocaleDateString() == newDate.toLocaleDateString()) {
-                lastElem.count += 1;
+        for (var i = 0; i < sdata.length; i++) {
+            if (sdata[i].timestamp > end) break;
+            if (sdata[i].timestamp > start) {
+                var found = false;
+                var newDate = new Date(sdata[i].timestamp * 1000);
+                var lastElem = results[1][results[1].length - 1];
+                binData(sdata[i].timestamp, 1);
+                if (lastElem && lastElem.date.toLocaleDateString() == newDate.toLocaleDateString()) {
+                    lastElem.count += 1;
+                }
+                else
+                    results[1].push({ date: newDate, count: 1 });
             }
-            else
-                results[1].push({ date: newDate, count: 1 });
-        });
+        };
 
-        bdata.forEach(function (d) {
-            var found = false;
-            var newDate = new Date(d.timestamp * 1000);
-            var lastElem = results[2][results[2].length - 1];
-            binData(d.timestamp, 2);
-            if (lastElem && lastElem.date.toLocaleDateString() == newDate.toLocaleDateString()) {
-                lastElem.count += 1;
+        for (var i = 0; i < bdata.length; i++) {
+            if (bdata[i].timestamp > end) break;
+            if (bdata[i].timestamp > start) {
+                var found = false;
+                var newDate = new Date(bdata[i].timestamp * 1000);
+                var lastElem = results[2][results[2].length - 1];
+                binData(bdata[i].timestamp, 2);
+                if (lastElem && lastElem.date.toLocaleDateString() == newDate.toLocaleDateString()) {
+                    lastElem.count += 1;
+                }
+                else
+                    results[2].push({ date: newDate, count: 1 });
             }
-            else
-                results[2].push({ date: newDate, count: 1 });
-        });
+        };
 
         for (var i = 0; i < 3; i++) {
             bins[i].forEach(function (day) {
@@ -100,7 +109,7 @@ DataProcessor = (function () {
     };
 
 
-    DataProcessor.parse_loc_data = function (data, accuracy, realName) {
+    DataProcessor.parse_loc_data = function (data, accuracy, realName, start, end) {
         var result = [];
         var extractNumber = function (hash) {
             return hash.substring(17, hash.length - 2)
@@ -134,22 +143,27 @@ DataProcessor = (function () {
 
         };
 
-        data.forEach(function (d) {
-            var found = false;
-            if (thisUser(d)) {
-                result.forEach(function (x) {
-                    if (Math.abs(x.lon - d.lon) < accuracy && Math.abs(x.lat - d.lat) < accuracy && x.type == d.type) {
-                        x.count += 1;
-                        found = true;
-                    }
-                });
+        for (var i = 0; i < data.length; i++)
+        {
+            if (data[i].timestamp > end) break;
+            if (data[i].timestamp > start) {
+                var d = data[i];
+                var found = false;
+                if (thisUser(d)) {
+                    result.forEach(function (x) {
+                        if (Math.abs(x.lon - d.lon) < accuracy && Math.abs(x.lat - d.lat) < accuracy && x.type == d.type) {
+                            x.count += 1;
+                            found = true;
+                        }
+                    });
 
-                if (!found) {
-                    d["count"] = 1;
-                    result.push(d);
+                    if (!found) {
+                        d["count"] = 1;
+                        result.push(d);
+                    }
                 }
             }
-        });
+        };
 
         return result;
     };
@@ -177,9 +191,7 @@ DataProcessor = (function () {
 
     DataProcessor.gen_loc_data = function (btData, smsData, callData, locData) {
         var results = { data: [] };
-        var extractNumber = function (hash) {
-            return hash.substring(17, hash.length - 2)
-        }
+
 
         callData.forEach(function (d) {
             var diff = locData[0].timestamp;
@@ -195,7 +207,7 @@ DataProcessor = (function () {
                     break;
             };
 
-            results.data.push({ lon: closest.location.longitude, lat: closest.location.latitude, type: "call", contact: [d.call.number] });
+            results.data.push({timestamp: d.timestamp, lon: closest.location.longitude, lat: closest.location.latitude, type: "call", contact: [d.call.number] });
         });
 
         smsData.forEach(function (d) {
@@ -212,7 +224,7 @@ DataProcessor = (function () {
                     break;
             };
 
-            results.data.push({ lon: closest.location.longitude, lat: closest.location.latitude, type: "sms", contact: [d.message.address] });
+            results.data.push({ timestamp: d.timestamp, lon: closest.location.longitude, lat: closest.location.latitude, type: "sms", contact: [d.message.address] });
         });
 
         btData.forEach(function (d) {
@@ -232,7 +244,7 @@ DataProcessor = (function () {
 
                 name.push(x.sensible_user_id);
             });
-            results.data.push({ lon: closest.location.longitude, lat: closest.location.latitude, type: "bt", contact: name });
+            results.data.push({ timestamp: d.timestamp, lon: closest.location.longitude, lat: closest.location.latitude, type: "bt", contact: name });
         });
 
         return results;
