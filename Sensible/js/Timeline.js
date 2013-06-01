@@ -21,30 +21,46 @@ Timeline = (function () {
         var toLabel = ["call", "sms", "bt"]
         var barPadding = 1;
         var data = DataProcessor.parse_timeline_data(chart.data);
+        
+        var date = new Date(Date.now()), ending = new Date(Date.now());
+        ending.setHours(0);
+        ending.setMinutes(0);
+        var starting = new Date(date.setMonth(date.getMonth() - 7))
+
         var n = 3, // number of layers
-            m = data[0].length; // number of samples per layer
+           m = data[0].length; // number of samples per layer
         var w = 1200,
-            h = 100,
-            my = d3.max(data, function (d) {
-                return d3.max(d, function (d) {
-                    return d.y0 + d.y;
-                });
-            }),
+            h = 100;       
+        var xscale = d3.time.scale().range([0, chart.width]).domain([d3.min(data[0], function (d) { return d.date; }), ending]);
+        var yscale = d3.scale.linear().range([100, 0]).domain([0, d3.max(data[0].map(function (d) { return d.y + d.y0; }))]);
+        var xAxis = d3.svg.axis().scale(xscale).orient("bottom");
+
+        var brush = d3.svg.brush()
+            .x(xscale)
+            .on("brush", brushed)
+            .on("brushend", brushend)
+            .extent([starting, ending]);
+       
+        var my = d3.max(data, function (d) {
+            return d3.max(d, function (d) {
+                return d.y0 + d.y;
+            });
+        }),
             mz = d3.max(data, function (d) {
                 return d3.max(d, function (d) {
                     return d.y;
                 });
             }),
-            x = function (d) { return d.x * w / m; },
             y0 = function (d) { return h - d.y0 * h / my; },
             y1 = function (d) { return h - (d.y + d.y0) * h / my; },
-            y2 = function (d) { return d.y * h / mz; }; // or `my` to not rescale
+            y2 = function (d) { return d.y * h / mz; };
 
-
+        var newDate = new Date();
+        var barInterval = xscale(new Date()) - xscale((new Date()).setDate(newDate.getDate() - 1)) - 1;
 
         var layers = chart.svg.selectAll("g.layer")
             .data(data)
-          .enter().append("svg:g")
+            .enter().append("svg:g")
             .style("fill", function (d,i) {
                 return chart.colors[toLabel[i]];
             })
@@ -53,37 +69,22 @@ Timeline = (function () {
 
         var bars = layers.selectAll("g.bar")
             .data(function (d) { return d; })
-          .enter().append("svg:g")
+            .enter().append("svg:g")
             .attr("class", "bar")
-            .attr("transform", function (d, i) { return "translate(" + x(d, i) + ",0)"; });
+            .attr("transform", function (d, i) {
+                d.date.setHours(0);
+                d.date.setMinutes(0);
+                return "translate(" + xscale(d.date) + ",0)";
+            });
 
         bars.append("svg:rect")
-            .attr("width", x({ x: .9 }))
+            .attr("x", 0)
+            .attr("width", barInterval)
             .attr("height", 0)
-          .transition()
+            .transition()
             .delay(function (d, i) { return i * 5; })
             .attr("y", y1)
-            .attr("height", function (d) { return y0(d) - y1(d); });     
-
-
-
-        var xscale = d3.time.scale().range([0, chart.width]),
-         yscale = d3.scale.linear().range([100, 0]);
-
-        var xAxis = d3.svg.axis().scale(xscale).orient("bottom");
-
-        var brush = d3.svg.brush()
-            .x(xscale)
-            .on("brush", brushed);
-
-        //var date = new Date(Date.now()), ending = new Date(Date.now());
-        //var starting = new Date(date.setMonth(date.getMonth() - 7))
-
-        //brush.extent([starting,ending]);
-
-        xscale.domain(/*[d3.min(data[0],function (d) { return d.date; }), ending]); */ d3.extent(data[0].map(function (d) { return d.date; })));
-        yscale.domain([0, d3.max(data[0].map(function (d) { return d.y + d.y0; }))]);
-
+            .attr("height", function (d) { return y0(d) - y1(d); });            
 
         chart.svg.append("g")
             .attr("class", "x axis")
@@ -98,15 +99,25 @@ Timeline = (function () {
             .attr("height", 100 + 7);
 
         var label = chart.svg.append("svg:text")
-        .attr("x", 500)
-        .attr("y", 5)
-        .attr("text-anchor", "middle")
-        .attr("id", "dates");
+            .attr("x", 500)
+            .attr("y", 5)
+            .attr("text-anchor", "middle")
+            .attr("id", "dates")
+            .text(brush.extent()[0].toDateString().split(" ")[1] + " " + brush.extent()[0].toDateString().split(" ")[2]
+                + "  -  " + brush.extent()[1].toDateString().split(" ")[1] + " " + brush.extent()[1].toDateString().split(" ")[2])
+            .attr("transform", "translate(100," + 145 + ")");
+
 
         function brushed() {
             label.text(brush.extent()[0].toDateString().split(" ")[1] + " " + brush.extent()[0].toDateString().split(" ")[2]
                 + "  -  " + brush.extent()[1].toDateString().split(" ")[1] + " " + brush.extent()[1].toDateString().split(" ")[2])
             .attr("transform", "translate(100," + 145 + ")");
+        }
+
+        function brushend() {
+            webchart.startTime = brush.extent()[0].valueOf() / 1000;
+            webchart.endTime = brush.extent()[1].valueOf() / 1000;
+            webchart.update_vis();
         }
 
     };
