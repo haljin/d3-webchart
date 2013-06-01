@@ -364,15 +364,20 @@ WebChart = (function () {
         var group = this.details.append("g")
         .attr("id", "button-help")
 		.on("click", function () {
-		    if(help==false)
+		    if(help==false && !chart.zoomed)
 		    {
-		        chart.zoom_help();
-		        help=true;
+		        chart.zoomed = true;
+		        Help.draw_help();
+
+		        help = true;
+		        button_text.text("x");
 		    }
 		   else if (help == true)
-		    {
-		        chart.unzoom_help();
+		   {
+		       chart.zoomed = false;
+		       Help.undraw_help();
 		        help = false;
+		        button_text.text("?");
             }
 		})
 		.on("mouseover", function () {
@@ -501,37 +506,11 @@ WebChart = (function () {
             });
         });
     };
-    WebChart.prototype.zoom_help = function (d) {
-        var chart = this;
-        chart.zoomed = true;
-        this.clicked = d;
-        
-        //Zoom out the rest of the visualization
-        this.web.transition().duration(1000)
-        .attr("transform", function (d) {
-            return "translate(70,50) scale(0.15)";
-        });
-
-    };
-
-
-
-    WebChart.prototype.unzoom_help = function () {
-        var chart = this;
-         
-        this.web.transition().duration(1000)
-        .attr("transform", function (d) {
-            return "translate(" + chart.center.x + ", " + (chart.center.y) + ") scale(1)";
-        });
-
-       
-        
-
-    };
-
+   
 
     WebChart.prototype.update_vis = function () {
         var chart = this;
+        if(chart.zoomed)
         var oldtotals = this.clicked.totalsData;
         this.update_nodes();
         this.friendScales.forEach(function (d) {
@@ -1296,8 +1275,6 @@ WebChart = (function () {
 
             content += "<span class=\"name\">Sms: </span><span class=\"value\">" + data.smsStat + " messages.</span><br/>";
             content += "<span class=\"name\">Bluetooth: </span><span class=\"value\">" + data.btStat + " connections.</span><br/>";
-            content += "<span class=\"name\">FScore: </span><span class=\"value\">" + data.friendshipScore + " </span><br/>";
-            content += "<span class=\"name\">Index: </span><span class=\"value\">" + i + " </span><br/>";
             return this.tooltip.showTooltip(content, d3.event);
         }
     };
