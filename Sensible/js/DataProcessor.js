@@ -96,13 +96,20 @@ DataProcessor = (function () {
     DataProcessor.parse_timeline_data = function (data) {
 
         var result = [[], [], []];
-
+        var maxc = 0, maxb = 0, maxs = 0;
+        data.data.forEach(function (d, i) {
+            maxc = d.callcount > maxc ? d.callcount : maxc;
+            maxs = d.smscount > maxs ? d.smscount : maxs;
+            maxb = d.btcount > maxb ? d.btcount : maxb;
+        });
+        maxc = maxs = maxb = 1;
 
         data.data.forEach(function (d, i) {
-            
-            result[0].push({ date: new Date(d.date), x: i, y: d.callcount, y0: 0 });
-            result[1].push({ date: new Date(d.date), x: i, y: d.smscount, y0: d.callcount });
-            result[2].push({ date: new Date(d.date), x: i, y: d.btcount, y0: d.callcount + d.smscount });
+            var theDate = new Date(d.date);
+            theDate.setHours(0, 0, 0, 0);
+            result[0].push({ date: theDate, x: i, y: d.callcount / maxc, y0: 0 });
+            result[1].push({ date: theDate, x: i, y: d.smscount / maxs, y0: d.callcount / maxc });
+            result[2].push({ date: theDate, x: i, y: d.btcount / maxb, y0: d.callcount / maxc + d.smscount / maxs });
         });
 
         return result;
@@ -257,9 +264,12 @@ DataProcessor = (function () {
         var result = [];
 
         btData.forEach(function (d) {
-            d.devices.forEach(function (x) {
+            var theDate = new Date(d.timestamp * 1000);
+            d.devices.forEach(function (x) {                
                 if (result.length != 0 &&
-                    (new Date(d.timestamp * 1000)).getDay() == result[result.length - 1].date.getDay()) {
+                    theDate.getDate() == result[result.length - 1].date.getDate() &&
+                    theDate.getMonth() == result[result.length - 1].date.getMonth() &&  
+                    theDate.getYear() == result[result.length - 1].date.getYear()) {
                     result[result.length - 1].btcount += 1;
                 }
                 else {
@@ -269,8 +279,12 @@ DataProcessor = (function () {
         });
         callData.forEach(function (d) {
             var added = false;
-            result.forEach(function (e) {
-                if ((new Date(d.timestamp * 1000)).getDay() == e.date.getDay()) {
+            var theDate = new Date(d.timestamp * 1000);
+            result.forEach(function (e) {                
+                if (
+                    theDate.getDate() == e.date.getDate() &&
+                    theDate.getMonth() == e.date.getMonth() &&  
+                    theDate.getYear() == e.date.getYear()) {
                     e.callcount += 1;
                     added = true;
                 }
@@ -281,8 +295,12 @@ DataProcessor = (function () {
         });
         smsData.forEach(function (d) {
             var added = false;
-            result.forEach(function (e) {
-                if ((new Date(d.timestamp * 1000)).getDay() == e.date.getDay()) {
+            var theDate = new Date(d.timestamp * 1000);
+            result.forEach(function (e) {                
+                if (
+                    theDate.getDate() == e.date.getDate() &&
+                    theDate.getMonth() == e.date.getMonth() &&  
+                    theDate.getYear() == e.date.getYear()) {
                     e.smscount += 1;
                     added = true;
                 }
@@ -295,7 +313,6 @@ DataProcessor = (function () {
         result.sort(function (a, b) {
             return a.date - b.date;
         });
-        return window.open("data:text/json;charset=utf-8," + escape(JSON.stringify({ data: result }, null, 2)));
     };
 
 

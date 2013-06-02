@@ -28,11 +28,11 @@ Timeline = (function () {
         var starting = new Date(date.setMonth(date.getMonth() - 7))
 
         var n = 3, // number of layers
-           m = data[0].length; // number of samples per layer
+           m = data[2].length; // number of samples per layer
         var w = 1200,
             h = 100;       
         var xscale = d3.time.scale().range([0, chart.width]).domain([d3.min(data[0], function (d) { return d.date; }), ending]);
-        var yscale = d3.scale.linear().range([100, 0]).domain([0, d3.max(data[0].map(function (d) { return d.y + d.y0; }))]);
+        var yscale = d3.scale.linear().range([100, 0]).domain([0, d3.max(data[2].map(function (d) { return d.y + d.y0; }))]);
         var xAxis = d3.svg.axis().scale(xscale).orient("bottom");
 
         var brush = d3.svg.brush()
@@ -46,14 +46,8 @@ Timeline = (function () {
                 return d.y0 + d.y;
             });
         }),
-            mz = d3.max(data, function (d) {
-                return d3.max(d, function (d) {
-                    return d.y;
-                });
-            }),
             y0 = function (d) { return h - d.y0 * h / my; },
-            y1 = function (d) { return h - (d.y + d.y0) * h / my; },
-            y2 = function (d) { return d.y * h / mz; };
+            y1 = function (d) { return h - (d.y + d.y0) * h / my; };
 
         var newDate = new Date();
         var barInterval = xscale(new Date()) - xscale((new Date()).setDate(newDate.getDate() - 1)) - 1;
@@ -61,19 +55,17 @@ Timeline = (function () {
         var layers = chart.svg.selectAll("g.layer")
             .data(data)
             .enter().append("svg:g")
-            .style("fill", function (d,i) {
+            .style("fill", function (d, i) {
                 return chart.colors[toLabel[i]];
             })
             .attr("class", "layer")
-            .attr("transform", function (d) { return "translate(" + "0,7)"; });
+            .attr("transform", function (d) { return "translate(0,7)"; });
 
         var bars = layers.selectAll("g.bar")
             .data(function (d) { return d; })
             .enter().append("svg:g")
             .attr("class", "bar")
-            .attr("transform", function (d, i) {
-                d.date.setHours(0);
-                d.date.setMinutes(0);
+            .attr("transform", function (d) {
                 return "translate(" + xscale(d.date) + ",0)";
             });
 
