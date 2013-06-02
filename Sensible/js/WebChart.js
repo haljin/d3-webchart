@@ -153,12 +153,12 @@ WebChart = (function () {
                     var node;
                     if (namesDict[name] == undefined) {
                         node = chart.createNode(chart.nodes.length, name, 0, 0, 0);
-                        node.callData.push({ timestamp: d.timestamp, score: d.call.duration });
+                        node.callData.push({ timestamp: d.timestamp, score: d.call.duration, stat: d.call.duration });
                         chart.nodes.push(node);
                         namesDict[name] = chart.nodes.length - 1;
                     }
                     else {
-                        chart.nodes[namesDict[name]].callData.push({ timestamp: d.timestamp, score: d.call.duration });
+                        chart.nodes[namesDict[name]].callData.push({ timestamp: d.timestamp, score: d.call.duration, stat: d.call.duration});
                     }
                 }
             }
@@ -174,12 +174,12 @@ WebChart = (function () {
                 var node;
                 if (namesDict[name] == undefined) {
                     node = chart.createNode(chart.nodes.length, name, 0, 0, 0);
-                    node.smsData.push({ timestamp: d.timestamp, score: 10 });
+                    node.smsData.push({ timestamp: d.timestamp, score: 10, stat: 1});
                     chart.nodes.push(node);
                     namesDict[name] = chart.nodes.length - 1;
                 }
                 else {
-                    chart.nodes[namesDict[name]].smsData.push({ timestamp: d.timestamp, score: 10 });
+                    chart.nodes[namesDict[name]].smsData.push({ timestamp: d.timestamp, score: 10, stat: 1});
                 }
             }
         });
@@ -196,13 +196,13 @@ WebChart = (function () {
                     var node;
                     if (namesDict[name] == undefined) {
                         node = chart.createNode(chart.nodes.length, name, 0, 0, 0);
-                        node.btData.push({ timestamp: d.timestamp, score: 5 });
+                        node.btData.push({ timestamp: d.timestamp, score: 5, stat: 1 });
                         chart.nodes.push(node);
                         namesDict[name] = chart.nodes.length - 1;
                     }
                     else {
                         var score = (chart.nodes[namesDict[name]].lastContact - d.timestamp > 300000) ? 300 : 5;
-                        chart.nodes[namesDict[name]].btData.push({ timestamp: d.timestamp, score: score });
+                        chart.nodes[namesDict[name]].btData.push({ timestamp: d.timestamp, score: score, stat: 1 });
                     }
                 }
             })
@@ -242,7 +242,7 @@ WebChart = (function () {
                 if (d.callData[i].timestamp > chart.endTime) break;
                 if (d.callData[i].timestamp > chart.startTime) {
                     d.callScore += d.callData[i].score;
-                    d.callStat += d.callData[i].score;
+                    d.callStat += d.callData[i].stat;
                     d.friendshipScore += inWorkHours(d.timestamp) ? d.callData[i].score * 0.5 : d.callData[i].score;
                 }
             }
@@ -250,7 +250,7 @@ WebChart = (function () {
                 if (d.smsData[i].timestamp > chart.endTime) break;
                 if (d.smsData[i].timestamp > chart.startTime) {
                     d.smsScore += d.smsData[i].score;
-                    d.smsStat += d.smsData[i].score;
+                    d.smsStat += d.smsData[i].stat;
                     d.friendshipScore += inWorkHours(d.timestamp) ? d.smsData[i].score * 0.5 : d.smsData[i].score;
                 }
             }
@@ -258,7 +258,7 @@ WebChart = (function () {
                 if (d.btData[i].timestamp > chart.endTime) break;
                 if (d.btData[i].timestamp > chart.startTime) {
                     d.btScore += d.btData[i].score;
-                    d.btStat += d.btData[i].score;
+                    d.btStat += d.btData[i].stat;
                     d.friendshipScore += inWorkHours(d.timestamp) ? d.btData[i].score * 0.25 : d.btData[i].score;
                 }
             }
@@ -305,8 +305,13 @@ WebChart = (function () {
                 chart.nodes[i].friendScale = null;
             }
         }
+        var slice = 0
+        for (var i = 0; i < 16; i++) {
+            if (chart.nodes[i].value == 0) break;
+            slice = i+1;
+        }
 
-        chart.displayedNodes = chart.nodes.slice(0, 16);
+        chart.displayedNodes = chart.nodes.slice(0, slice);
         chart.displayedNodes.forEach(function (d) {
             d.radius = chart.radius_scale(d.value)
             var parsed = DataProcessor.parse_totals_data(d.callData, d.smsData, d.btData, chart.startTime, chart.endTime);
@@ -781,14 +786,7 @@ WebChart = (function () {
 
         g.append("g")
         .attr("class", "y axis")
-            .call(yAxis)
-          .append("text")
-            .attr("transform", "rotate(-90)")
-            .attr("y", 6)
-            .attr("dy", ".71em")
-            .style("text-anchor", "end")
-            .text("Propability");
-
+            .call(yAxis);
         var day = g.selectAll(".day")
             .data(data[type])
           .enter().append("g")
