@@ -45,7 +45,7 @@ MapView = (function () {
         d3.json("data/dk.json", function (error, dk) {
 
             map.subunits = [].concat(topojson.feature(dk, dk.objects.subunits).features, topojson.feature(dk, dk.objects.prov).features);
-            map.gsh.append("rect").attr("x", -10000).attr("y", -10000).attr("width", 20000).attr("height", 20000).style("fill", "#ffffff");
+            map.gsh.append("rect").attr("x", -1500).attr("y", -1500).attr("width", 3000).attr("height", 3000).style("fill", "#ffffff").style("stroke", "#000000").style("stroke-width", "10px");
 
             
             map.gsh.selectAll(".subunit")
@@ -159,7 +159,8 @@ MapView = (function () {
                .text("Loading...");
     };
 
-    MapView.prototype.update_points =function () {
+    MapView.prototype.update_points = function () {
+        var map = this;
         this.gleg.selectAll("circle")
                     .attr("cx", function (d) {
                         return map.projection([d.lon, d.lat])[0];
