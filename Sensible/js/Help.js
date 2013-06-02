@@ -8,10 +8,18 @@ Help = (function () {
 
     Help.draw_help = function () {
         //Draw the unzoom button
+        var chart = this;
+        var toLabel = ["call", "sms", "bt"];
         var button,
             button_text,
             help = false;
         var group = d3.select("#Details").append("g").attr("id","help");
+        this.colors = { call: "#b1f413", sms: "#ffd314", bt: "#7f1ac3" };
+        this.shapes = {
+            call: "04,00 08,04 05,07 05,08 13,16 14,16 17,13 21,16 17,21 12,21 00,09 00,04 04,00",
+            sms: "00,00 25,00 25,15 00,15 00,00 13,7 25,00",
+            bt: "00,07 05,10 05,00 12,05 05,10 12,15 05,20 05,10 00,13"
+        };
 
         //timeline
         group.append("marker")
@@ -191,8 +199,71 @@ Help = (function () {
 .style("font-size", "20px")
 .style("font-variant", "small-caps")
 .text("are your school friends");
-    };
 
+        group.append("text")
+.attr("x", 50)
+.attr("y", 270)
+.style("font-family", "Segoe UI")
+.style("font-size", "20px")
+.style("font-variant", "small-caps")
+.text("The bigger the bubble");
+
+        group.append("text")
+  .attr("x", 30)
+  .attr("y", 290)
+  .style("font-family", "Segoe UI")
+  .style("font-size", "20px")
+  .style("font-variant", "small-caps")
+  .text("the more contact you have");
+   
+
+
+    group.append("text")
+.attr("x", 30)
+.attr("y", 370)
+.style("font-family", "Segoe UI")
+.style("font-size", "20px")
+.style("font-variant", "small-caps")
+.text("The color tells you");
+
+    group.append("text")
+.attr("x", 30)
+.attr("y", 390)
+.style("font-family", "Segoe UI")
+.style("font-size", "20px")
+.style("font-variant", "small-caps")
+.text("what contact form ");
+
+    group.append("text")
+.attr("x", 30)
+.attr("y", 410)
+.style("font-family", "Segoe UI")
+.style("font-size", "20px")
+.style("font-variant", "small-caps")
+.text(" is the most common");
+
+
+        group.selectAll(".symbols").data([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]).enter().append("polyline")
+        .attr("transform", function (d, i) {
+            switch (i) {
+                case 0:
+                    return "translate(30, 430)";
+                case 1:
+                    return "translate(90, 430)";
+                case 2:
+                    return "translate(150, 430)";
+            }
+        })
+        .attr("stroke", function (d, i) {
+            return chart.colors[toLabel[i]];
+        })
+        .style("stroke-width", "2px")
+            .attr("class", "symbols")
+       .style("fill", "none")
+        .attr("points", function (d, i) {
+            return chart.shapes[toLabel[i]];
+        });
+};
     Help.undraw_help = function () {
         return d3.select("#Details").select("#help").remove();
     };
