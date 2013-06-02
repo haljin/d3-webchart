@@ -174,12 +174,12 @@ WebChart = (function () {
                 var node;
                 if (namesDict[name] == undefined) {
                     node = chart.createNode(chart.nodes.length, name, 0, 0, 0);
-                    node.smsData.push({ timestamp: d.timestamp, score: 1 });
+                    node.smsData.push({ timestamp: d.timestamp, score: 10 });
                     chart.nodes.push(node);
                     namesDict[name] = chart.nodes.length - 1;
                 }
                 else {
-                    chart.nodes[namesDict[name]].smsData.push({ timestamp: d.timestamp, score: 1 });
+                    chart.nodes[namesDict[name]].smsData.push({ timestamp: d.timestamp, score: 10 });
                 }
             }
         });
@@ -217,7 +217,10 @@ WebChart = (function () {
     WebChart.prototype.update_nodes = function () {
         var chart = this;
         var inWorkHours = function (timestamp) {
-            var result = DataProcessor.get_timeslot(new Date(timestamp * 1000));
+            var d = new Date(timestamp * 1000);
+            if (d.getDay() == 6 || d.getDay() == 5)
+                return false;
+            var result = DataProcessor.get_timeslot(d);
             return DAYSLOT.EARLYCLASS || DAYSLOT.LATECLASS;
         }
         chart.nodes.forEach(function (d) {
@@ -240,7 +243,7 @@ WebChart = (function () {
                 if (d.callData[i].timestamp > chart.startTime) {
                     d.callScore += d.callData[i].score;
                     d.callStat += d.callData[i].score;
-                    d.friendshipScore += inWorkHours(d.timestamp) ? d.callData[i].score : d.callData[i].score * 0.5;
+                    d.friendshipScore += inWorkHours(d.timestamp) ? d.callData[i].score * 0.5 : d.callData[i].score;
                 }
             }
             for (var i = 0; i < d.smsData.length; i++) {
@@ -248,7 +251,7 @@ WebChart = (function () {
                 if (d.smsData[i].timestamp > chart.startTime) {
                     d.smsScore += d.smsData[i].score;
                     d.smsStat += d.smsData[i].score;
-                    d.friendshipScore += inWorkHours(d.timestamp) ? d.smsData[i].score : d.smsData[i].score * 0.5;
+                    d.friendshipScore += inWorkHours(d.timestamp) ? d.smsData[i].score * 0.5 : d.smsData[i].score;
                 }
             }
             for (var i = 0; i < d.btData.length; i++) {
@@ -256,7 +259,7 @@ WebChart = (function () {
                 if (d.btData[i].timestamp > chart.startTime) {
                     d.btScore += d.btData[i].score;
                     d.btStat += d.btData[i].score;
-                    d.friendshipScore += inWorkHours(d.timestamp) ? d.btData[i].score : d.btData[i].score * 0.5;
+                    d.friendshipScore += inWorkHours(d.timestamp) ? d.btData[i].score * 0.25 : d.btData[i].score;
                 }
             }
         });
@@ -1231,6 +1234,15 @@ WebChart = (function () {
                 return arc(interpolation(t));
             };
         })
+
+        chart.details.selectAll(".symbol").data(pie(newpie))
+            .transition()
+            .duration(500)
+           .attr("transform", function (d,i) {
+               return "translate(" + Math.cos(((d.startAngle + d.endAngle - Math.PI) / 2)) * (chart.zoomed_radius + 30) +
+                   "," + Math.sin((d.startAngle + d.endAngle - Math.PI) / 2) * (chart.zoomed_radius + 30) + ")";
+           });
+
 
     };
 
