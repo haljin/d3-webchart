@@ -93,24 +93,44 @@ DataProcessor = (function () {
 
     };
 
+    DataProcessor.parse_nb_data = function (curr, neighbours, start, end) {
+        var nbs = []
+        var result = {}
+        for (var i = 0; i < neighbours.length; i++) {
+            if (neighbours[i].name != curr.name) {
+                result[neighbours[i].name] = 0;
+            }
+        }
+
+        for (var nbname in result) {
+            var it = 0;
+            while (curr.nbData[nbname] && it < curr.nbData[nbname].length && curr.nbData[nbname][it] < end) {
+                if(curr.nbData[nbname][i] > start)
+                    result[nbname] += 1;
+                it++;
+            }
+        }
+        return result;
+    };
+
     DataProcessor.parse_timeline_data = function (data) {
 
         var result = [[], [], []];
         var maxc = 0, maxb = 0, maxs = 0;
-        data.data.forEach(function (d, i) {
-            maxc = d.callcount > maxc ? d.callcount : maxc;
-            maxs = d.smscount > maxs ? d.smscount : maxs;
-            maxb = d.btcount > maxb ? d.btcount : maxb;
-        });
+        for (var i = 0; i < data.data.length; i++) {
+            maxc = data.data[i].callcount > maxc ? data.data[i].callcount : maxc;
+            maxs = data.data[i].smscount > maxs ? data.data[i].smscount : maxs;
+            maxb = data.data[i].btcount > maxb ? data.data[i].btcount : maxb;
+        }
         maxc = maxs = maxb = 1;
 
-        data.data.forEach(function (d, i) {
-            var theDate = new Date(d.date);
+        for (var i = 0; i < data.data.length; i++) {
+            var theDate = new Date(data.data[i].date);
             theDate.setHours(0, 0, 0, 0);
-            result[0].push({ date: theDate, x: i, y: d.callcount / maxc, y0: 0 });
-            result[1].push({ date: theDate, x: i, y: d.smscount / maxs, y0: d.callcount / maxc });
-            result[2].push({ date: theDate, x: i, y: d.btcount / maxb, y0: d.callcount / maxc + d.smscount / maxs });
-        });
+            result[0].push({ date: theDate, x: i, y: data.data[i].callcount / maxc, y0: 0 });
+            result[1].push({ date: theDate, x: i, y: data.data[i].smscount / maxs, y0: data.data[i].callcount / maxc });
+            result[2].push({ date: theDate, x: i, y: data.data[i].btcount / maxb, y0: data.data[i].callcount / maxc + data.data[i].smscount / maxs });
+        }
 
         return result;
     };
