@@ -3,7 +3,6 @@ var DAYSLOT = { MORNING: 0, EARLYCLASS: 1, LUNCH: 2, LATECLASS: 3, AFTER: 4 };
 
 WebChart = (function () {
     function WebChart(token) {
-
         //Main layout fields
         this.vis = null;
         this.width = 1200;
@@ -18,6 +17,7 @@ WebChart = (function () {
             sms: "00,00 25,00 25,15 00,15 00,00 13,7 25,00",
             bt: "00,07 05,10 05,00 12,05 05,10 12,15 05,20 05,10 00,13"
         };
+        this.clusterColors = ["#ff0000", "#00ff00", "#0000ff", "#ffff00", "#ff00ff", "#00ffff", "#880000", "#008800", "#000088", "#888800", "#880088", "#008888"];
 
         //Web layour fields
         this.web = null;
@@ -60,6 +60,8 @@ WebChart = (function () {
                 y: 0,
                 radius: 0,
                 value: 0,               //Total score of node
+                group: "bt",               //Which group the node belongs to (bt, call, sms)  
+                cluster: 0,             //Which cluster within the network the node belongs to
                 callScore: 0,           //Score awarded for calls in given timeframe
                 smsScore: 0,            //Score awarded for sms in given timeframe
                 btScore: 0,             //Score awarded for bt in given timeframe
@@ -99,13 +101,23 @@ WebChart = (function () {
         }, 1000);
     };
 
+    /*******************************************************************************/
+    /********************** WEB CHART VISUALIZATION ********************************/
+    /*******************************************************************************/
+
+    /********************************************************************************
+    *   FUNCTION: load_data                                                         *
+    *   Load the data for the visualization from the Sensible server                *            
+    *   start - start timestamp to load data from                                   *            
+    *   end - end timestamp to load data to                                         *
+    ********************************************************************************/
     WebChart.prototype.load_data = function (start, end) {
         var chart = this;
         var remaining = 3;
-        var runOnce = [false, false, false];
+        var runOnce = [false, false, false]; //In Chrome sometimes json would be loaded twice?
         this.startTime = start / 1000;
         this.endTime = end / 1000;
-        //Load Call probe data
+        //Load Call probe data. Load parallel rather than sequential
         d3.json(chart.baseUrl + "/call_log/" + chart.token, function (data) {
             if (!runOnce[0]) {
                 runOnce[0] = true;
@@ -116,7 +128,6 @@ WebChart = (function () {
         });
         //Load SMS probe data
         d3.json(chart.baseUrl + "/sms/" + chart.token, function (data) {
-
             if (!runOnce[1]) {
                 runOnce[1] = true;
                 chart.smsData = data;
@@ -136,19 +147,23 @@ WebChart = (function () {
 
     };
 
+    /********************************************************************************
+    *   FUNCTION: create_nodes                                                      *
+    *   Create the data nodes from the loaded data. Perform all pre-computation.    *   
+    ********************************************************************************/
     WebChart.prototype.create_nodes = function () {        
         var chart = this;
-        var namesDict = {};
-        //Helper functions to parse data and create data nodes
+        var namesDict = {};     //Dictionary to store indices of nodes in the array, for faster data insertion        
         var extractNumber = function (hash) {
             return hash.substring(17, hash.length - 2)
-        }
+        }                       //Helper function to parse data and create data nodes
 
         //Parse Call data
         for (var i = 0; i < chart.callData.length; i++) {
             var d = chart.callData[i];
             var name;
 
+            //TODO: Fake translate between sensible_user_id and phone numbers, must be replaced with real stuff
             fake.forEach(function (l) {
                 if (l.number == extractNumber(d.call.number))
                     name = l.real_name;
@@ -172,6 +187,7 @@ WebChart = (function () {
         for (var i = 0; i < chart.smsData.length; i++) {
             var d = chart.smsData[i];
             var name;
+            //TODO: Fake translate between sensible_user_id and phone numbers, must be replaced with real stuff
             fake.forEach(function (l) {
                 if (l.number == extractNumber(d.message.address))
                     name = l.real_name;
@@ -196,6 +212,7 @@ WebChart = (function () {
             var neighbouring = [];
             for(var j = 0; j < d.devices.length; j++) {
                 var name;
+                //TODO: Fake translate between sensible_user_id and phone numbers, must be replaced with real stuff
                 fake.forEach(function (l) {
                     if (d.devices[j].sensible_user_id == l.sensible_user_id)
                         name = l.real_name;
@@ -229,26 +246,38 @@ WebChart = (function () {
             }
         }
 
+        var getScales = function () {
+            var result = [];
+            for (var i = 0 ; i < chart.segments ; i++)
+                result.push({
+                    scale: d3.scale.linear().domain([chart.minFriendship, chart.maxFriendship]).range([chart.points.byLevel[chart.levels - 1][i], chart.points.byLevel[0][i]]),
+                    pointa: chart.points.byLevel[chart.levels - 1][i], pointb: chart.points.byLevel[0][i]
+                });
+            return result;
+        };
+
+        chart.friendScales = getScales();
+
+
         chart.update_nodes();
         screen.hide_loading_screen();
         return chart.create_vis();
-
     };
 
+    /********************************************************************************
+    *   FUNCTION: update_nodes                                                      *
+    *   Update the data nodes in regards to new displayed time period.              *   
+    ********************************************************************************/
     WebChart.prototype.update_nodes = function () {
-        var chart = this;
-        //Helper function to determine whether timestamp is within class hours
+        var chart = this;        
         var inWorkHours = function (timestamp) {
             var d = new Date(timestamp * 1000);
             if (d.getDay() == 6 || d.getDay() == 5)
                 return false;
             var result = DataProcessor.get_timeslot(d);
             return DAYSLOT.EARLYCLASS || DAYSLOT.LATECLASS;
-        }
+        }       //Helper function to determine whether timestamp is within class hours
 
-        for (var i = 0; i < chart.nodes.length; i++) {
-            
-        }
         chart.totalScore = 0;
         chart.maxBtScore = 0;
         chart.maxCallScore = 0;
@@ -307,8 +336,7 @@ WebChart = (function () {
             chart.minFriendship = d.friendshipScore < chart.minFriendship ? d.friendshipScore : chart.minFriendship;
         }
 
-        var max_radius = d3.scale.pow().exponent(0.5).domain([0, 1500]).range([50, 30]);
-        chart.radius_scale = d3.scale.pow().exponent(0.5).domain([0, max_amount]).range([10, 50]);//max_radius(chart.totalScore)]);
+        chart.radius_scale = d3.scale.pow().exponent(0.5).domain([0, max_amount]).range([10, 50]);
 
         chart.nodes.sort(function (a, b) {
             return b.value - a.value;
@@ -322,7 +350,7 @@ WebChart = (function () {
             }
         }
 
-        //Cut off the top 16 nodes, less if there would be 0 value  nodes
+        //Cut off the top 16 nodes, less if there would be nodes of value 0
         var slice = 0
         for (var i = 0; i < 16; i++) {
             if (chart.nodes[i].value == 0) break;
@@ -342,6 +370,14 @@ WebChart = (function () {
                 d.friendScale = chart.unusedScales.pop();
             }
         }
+
+        var clusters = clusterfck.hcluster(webchart.displayedNodes, function (a, b) { return 1 / a.nbScores[b.name] }, clusterfck.AVERAGE_LINKAGE)
+        for (var i = 0; i < clusters.length; i++) {
+            chart.parseClusters(clusters[i], i);
+        }
+
+        chart.displayedNodes = chart.placeGreedy();
+
         //If the node that was zoomed disappeared from main vis, still update zoomed view
         if (chart.zoomed) {
             var d = chart.clicked;
@@ -351,6 +387,10 @@ WebChart = (function () {
         }
     };
 
+    /********************************************************************************
+    *   FUNCTION: create_vis                                                        *
+    *   Draw the visualization itself, the first time it is displayed.              *   
+    ********************************************************************************/
     WebChart.prototype.create_vis = function () {
         var chart = this;
         if (d3.select("#svg_vis").empty())
@@ -387,7 +427,7 @@ WebChart = (function () {
         this.web.append("rect").attr("x", -400).attr("y", -400).attr("height", 800).attr("width", 800).style("fill", "#ffffff");
 
 
-        //Draw the unzoom button
+        //Draw the help button
         var button,
             button_text,
             help = false;
@@ -402,13 +442,13 @@ WebChart = (function () {
 		        help = true;
 		        button_text.text("x");
 		    }
-		   else if (help == true)
-		   {
-		       chart.zoomed = false;
-		       Help.undraw_help();
+		    else if (help == true)
+		    {
+		        chart.zoomed = false;
+		        Help.undraw_help();
 		        help = false;
 		        button_text.text("?");
-            }
+		    }
 		})
 		.on("mouseover", function () {
 		    button.attr("fill", "#B1B1B1");
@@ -435,10 +475,8 @@ WebChart = (function () {
 		.style("font-variant", "small-caps")
 		.style("font-weight", "bold")
 		.text("?");
-    
 
-
-        //dookola  
+        //Draw the web circles  
         for (level = 0; level < chart.levels; level++) {
             for (j = 0; j < chart.segments; j++) {
                 var point = chart.points.byLevel[level][j]
@@ -457,11 +495,10 @@ WebChart = (function () {
                     .attr("d", " M " + point.x + "," + point.y + " C " + nextPoint1Control.x + "," + nextPoint1Control.y + " "
                     + nextPoint2Control.x + "," + nextPoint2Control.y + " " + nextPoint.x + "," + nextPoint.y)
                     .attr("fill", "none")
-                //.attr("d", "M " + point.x + " " + point.y + " L " + nextPoint.x + " " + nextPoint.y)
-                .style("stroke", "#055");
+                    .style("stroke", "#055");
             }
         }
-        //wysokosc
+        //Draw the web radial lines
         for (segment = 0; segment < chart.segments; segment++) {
             console.debug(chart.points.bySegment[segment]);
             var start = chart.points.bySegment[segment][0];
@@ -488,7 +525,6 @@ WebChart = (function () {
                 });
             return result;
         };
-        var friendScale = d3.scale.linear().range([0, chart.maxFriendship]);
         chart.friendScales = getPoints();
         chart.friendScales.randomize();
         this.displayedNodes.forEach(function (d, i) {
@@ -497,7 +533,8 @@ WebChart = (function () {
         this.circles.enter().append("circle")
             .attr("r", 0)
             .attr("fill", function (d) {
-                return chart.colors[d.group];
+                return chart.clusterColors[d.cluster];
+                //return chart.colors[d.group];
             })
             .attr("stroke-width", 2).attr("stroke", function (d) {
                 return d3.rgb(chart.colors[d.group]).darker();
@@ -537,26 +574,30 @@ WebChart = (function () {
         });
     };
    
-
+    /********************************************************************************
+    *   FUNCTION: update_vis                                                        *
+    *   Update the drawn visualization, based on the time period change.            *   
+    ********************************************************************************/
     WebChart.prototype.update_vis = function () {
         var chart = this;
         if(chart.zoomed)
             var oldtotals = this.clicked.totalsData;
 
         this.update_nodes();
+        //Rescale the scales
         this.friendScales.forEach(function (d) {
             d.scale = d3.scale.linear().domain([chart.minFriendship, chart.maxFriendship]).range([d.pointa, d.pointb]);
         });
         this.circles = this.web.selectAll("circle").data(chart.displayedNodes, function (d) {
             return d.id;
         });
-        //var change = this.circles.enter();
         this.circles.exit().transition().duration(500).attr("r", 0).remove();
-
+        
         chart.circles.enter().append("circle")
             .attr("r", 0)
             .attr("fill", function (d) {
-                return chart.colors[d.group];
+                return chart.clusterColors[d.cluster];
+                //return chart.colors[d.group];
             })
             .attr("stroke-width", 2).attr("stroke", function (d) {
                 return d3.rgb(chart.colors[d.group]).darker();
@@ -582,30 +623,30 @@ WebChart = (function () {
                 }
             });
 
-        chart.circles.transition().duration(500).attr("r", function (d) {
-            return d.radius;
-        }).each("end", function () {
-            chart.circles.transition().duration(500).attr("cx", function (d) {
-                d.x = d.friendScale.scale(d.friendshipScore).x
-                return d.friendScale.scale(d.friendshipScore).x;
-            })
-            .attr("cy", function (d) {
-                d.y = d.friendScale.scale(d.friendshipScore).y
-                return d.friendScale.scale(d.friendshipScore).y;
-            })
-            .attr("fill", function (d) {
-                if (chart.zoomed)
-                    return d3.rgb(chart.colors[d.group]).darker().darker().darker();
-                else
-                    return chart.colors[d.group];
-            })
-                .attr("stroke", function (d) {
-                    return d3.rgb(chart.colors[d.group]).darker();
-                });
-        });
+        chart.circles.transition().duration(500)
+            .attr("r", function (d) {
+                return d.radius; })
+            .each("end", function () {
+                chart.circles.transition().duration(500)
+                    .attr("cx", function (d) {
+                        d.x = d.friendScale.scale(d.friendshipScore).x;
+                        return d.friendScale.scale(d.friendshipScore).x; })
+                    .attr("cy", function (d) {
+                        d.y = d.friendScale.scale(d.friendshipScore).y
+                        return d.friendScale.scale(d.friendshipScore).y; })
+                    .attr("fill", function (d) {
+                        if (chart.zoomed)
+                            return d3.rgb(chart.colors[d.group]).darker().darker().darker();
+                        else
+                            return chart.clusterColors[d.cluster];
+                        //return chart.colors[d.group]; 
+                    })
+                    .attr("stroke", function (d) {
+                        return d3.rgb(chart.colors[d.group]).darker(); });
+            });
 
         if (this.zoomed) {
-            //Update pie chart
+            //Update zoomed views
             this.update_pie_chart();
             this.update_barschart();
             this.undraw_multichart();
@@ -648,6 +689,16 @@ WebChart = (function () {
         }
     };
 
+
+
+    /*******************************************************************************/
+    /********************** DETAILS VISUALIZATIONS* ********************************/
+    /*******************************************************************************/
+
+    /********************************************************************************
+    *   FUNCTION: zoom_circle                                                       *
+    *   Zoom in the clicked circle.                                                 *
+    ********************************************************************************/
     WebChart.prototype.zoom_circle = function (d) {
         var chart = this;
         chart.zoomed = true;
@@ -697,6 +748,10 @@ WebChart = (function () {
 		});
     };
 
+    /********************************************************************************
+    *   FUNCTION: unzoom_circle                                                     *
+    *   Destroy the details visualizations and unzoom circle.                       *
+    ********************************************************************************/
     WebChart.prototype.unzoom_circle = function () {
         var chart = this;
         var other_circles = this.circles;
@@ -742,6 +797,10 @@ WebChart = (function () {
 
     };
 
+    /********************************************************************************
+    *   FUNCTION: draw_details                                                      *
+    *   Draw the details visualizations                                             *
+    ********************************************************************************/
     WebChart.prototype.draw_details = function (d) {
         this.map = new MapView(d);
 
@@ -1139,27 +1198,27 @@ WebChart = (function () {
                            return content;                           
                        });
 
-                chart.details.append("text")
-                    .attr("x", function (d) { return (400 + (chart.clicked.name.length * 18) / 2); })
-                    .attr("id", "numberOfConnectionsSms")
-                    .attr("y", 80)
-                    .style("font-family", "Segoe UI")
-                    .style("font-size", "15px")
-                    .style("font-variant", "small-caps")
-                    .text(function () {
-                        return chart.clicked.smsStat + " messages";   
-                    });
+        chart.details.append("text")
+            .attr("x", function (d) { return (400 + (chart.clicked.name.length * 18) / 2); })
+            .attr("id", "numberOfConnectionsSms")
+            .attr("y", 80)
+            .style("font-family", "Segoe UI")
+            .style("font-size", "15px")
+            .style("font-variant", "small-caps")
+            .text(function () {
+                return chart.clicked.smsStat + " messages";   
+            });
 
-                chart.details.append("text")
-                 .attr("x", function (d) { return (400 + (chart.clicked.name.length * 18) / 2) +100; })
-                 .attr("id", "numberOfConnectionsBt")
-                 .attr("y", 80)
-                 .style("font-family", "Segoe UI")
-                 .style("font-size", "15px")
-                 .style("font-variant", "small-caps")
-                 .text(function () {
-                     return chart.clicked.btStat + " connections";
-                 });
+        chart.details.append("text")
+         .attr("x", function (d) { return (400 + (chart.clicked.name.length * 18) / 2) +100; })
+         .attr("id", "numberOfConnectionsBt")
+         .attr("y", 80)
+         .style("font-family", "Segoe UI")
+         .style("font-size", "15px")
+         .style("font-variant", "small-caps")
+         .text(function () {
+             return chart.clicked.btStat + " connections";
+         });
 
         paths
             .on("mouseover", function (d) {
@@ -1362,6 +1421,81 @@ WebChart = (function () {
         }
         return points;
     };
+
+    WebChart.prototype.parseClusters = function (cluster, number) {
+        var node = cluster;
+        var stack = [];
+
+        stack.push(cluster);
+        while (stack.length != 0) {
+            var curr = stack.pop();
+            if(curr.left == undefined && curr.right == undefined)
+            {
+                curr.canonical.cluster = number;
+            }
+            else
+            {
+                stack.push(curr.left);
+                stack.push(curr.right);
+            }
+        }
+    };
+
+    WebChart.prototype.placeGreedy = function () {
+        var positions = [];
+        var chart= this; 
+        var minPlacement = { index: 0, force: 0 };
+
+        for (var i = 0; i < chart.displayedNodes.length; i++) {
+            var lastPosition = 0;
+            var alreadyPlaced = [];
+            positions.push([]);
+            positions[i].push(chart.displayedNodes[i]);
+            alreadyPlaced.push(chart.displayedNodes[i].name);           
+
+            while (alreadyPlaced.length != chart.displayedNodes.length) {
+                var last = positions[i][positions[i].length - 1];
+                var closest = { name: "", score: 0 };
+
+                for (var nbname in last.nbScores) {
+                    if (alreadyPlaced.indexOf(nbname) >= 0) continue;
+                    if (last.nbScores[nbname] >= closest.score)
+                        closest = { name: nbname, score: last.nbScores[nbname] };
+                }
+
+                for (var j = 0; j < chart.displayedNodes.length; j++) {
+                    if (chart.displayedNodes[j].name == closest.name) {
+                        positions[i].push(chart.displayedNodes[j]);
+                        alreadyPlaced.push(closest.name);
+                        break;
+                    }
+                }
+            }
+            if (i == 0)
+                minPlacement = { index: 0, force: chart.evalPlacement(positions[i]) };
+            else {
+                var newForce = chart.evalPlacement(positions[i]);
+                if (newForce < minPlacement.force) 
+                    minPlacement = { index: i, force: newForce };                
+            }            
+        }
+
+        return positions[minPlacement.index];
+    };
+
+    WebChart.prototype.placeClusters = function () {
+    };
+
+    WebChart.prototype.evalPlacement = function (placement) {
+        var force = 0;
+        for (var i = 0; i < placement.length; i++) {
+            for (var j = i + 1; j < placement.length; j++) {
+                force += (placement[i].nbScores[placement[j].name]) * Math.log((j - i) / 1);
+            }
+        }
+        return force;
+    };
+
 
     return WebChart;
 })();
