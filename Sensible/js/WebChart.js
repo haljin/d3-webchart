@@ -17,7 +17,7 @@ WebChart = (function () {
             sms: "00,00 25,00 25,15 00,15 00,00 13,7 25,00",
             bt: "00,07 05,10 05,00 12,05 05,10 12,15 05,20 05,10 00,13"
         };
-        this.clusterColors = ["#ff0000", "#00ff00", "#0000ff", "#ffff00", "#ff00ff", "#00ffff", "#880000", "#008800", "#000088", "#888800", "#880088", "#008888"];
+        this.clusterColors = ["#ff0000", "#00ff00", "#0000ff", "#ffff00", "#ff00ff", "#00ffff", "#880000", "#008800", "#000088", "#888800", "#880088", "#008888", "#000000", "#ffffff", "#888888", "#444444"];
 
         //Web layour fields
         this.web = null;
@@ -27,6 +27,8 @@ WebChart = (function () {
         this.radius_scale;
         this.friendScales;
         this.unusedScales = [];
+        this.colorScale = d3.scale.linear().range([0, 1]);//"#00000000", "#000000FF"]);
+        this.locationDictionary = {};
 
         //Detailed view layour fields
         this.details = null;
@@ -94,10 +96,13 @@ WebChart = (function () {
 
         var date = new Date(Date.now());
         var obj = this;
-        var starting = date.setMonth(date.getMonth() - 7)
+        //TODO: HARDCODED BLAST TO THE PAST
+        var starting = new Date(1349958465000)//date.setMonth(date.getMonth() - 7)
+                       
+
 
         setTimeout(function () {
-            obj.load_data(starting, Date.now());
+            obj.load_data(starting, new Date(1369239142000));//Date.now());
         }, 1000);
     };
 
@@ -334,21 +339,17 @@ WebChart = (function () {
             chart.maxSmsScore = d.smsScore > chart.maxSmsScore ? d.smsScore : chart.maxSmsScore;
             chart.maxFriendship = d.friendshipScore > chart.maxFriendship ? d.friendshipScore : chart.maxFriendship;
             chart.minFriendship = d.friendshipScore < chart.minFriendship ? d.friendshipScore : chart.minFriendship;
-        }
+        }        
 
+        //Update scales
         chart.radius_scale = d3.scale.pow().exponent(0.5).domain([0, max_amount]).range([10, 50]);
+        chart.friendScales.forEach(function (d) {
+            d.scale = d3.scale.linear().domain([chart.minFriendship, chart.maxFriendship]).range([d.pointa, d.pointb]);
+        });
 
         chart.nodes.sort(function (a, b) {
             return b.value - a.value;
-        });
-
-        //Clear the scales from nodes over the top 16
-        for (var i = 16; i < chart.nodes.length; i++) {
-            if (chart.nodes[i].friendScale != null) {
-                chart.unusedScales.push(chart.nodes[i].friendScale);
-                chart.nodes[i].friendScale = null;
-            }
-        }
+        });     
 
         //Cut off the top 16 nodes, less if there would be nodes of value 0
         var slice = 0
@@ -365,20 +366,31 @@ WebChart = (function () {
             d.nbScores = DataProcessor.parse_nb_data(d, chart.displayedNodes, chart.startTime, chart.endTime);
             d.totalsData = parsed.totals;
             d.binsData = parsed.bins;
-            if (d.friendScale == null) {
-                //Give it one of the unused scales
-                d.friendScale = chart.unusedScales.pop();
-            }
         }
 
         var clusters = clusterfck.hcluster(webchart.displayedNodes, function (a, b) { return 1 / a.nbScores[b.name] }, clusterfck.AVERAGE_LINKAGE)
         for (var i = 0; i < clusters.length; i++) {
             chart.parseClusters(clusters[i], i);
         }
-
         chart.displayedNodes = chart.placeGreedy();
+        
+        chart.displayedNodes.forEach(function (d, i) {
+            d.friendScale = chart.friendScales[i];
+            chart.locationDictionary[d.name] = { x: d.friendScale.scale(d.friendshipScore).x, y: d.friendScale.scale(d.friendshipScore).y };
+        });
 
-        //If the node that was zoomed disappeared from main vis, still update zoomed view
+        //TODO: Replace this with a function that finds all the non-duplicate connections, might as well find max/min when at it
+        var maxNbScore = 0, minNbScore = chart.displayedNodes[0].nbScores[chart.displayedNodes[1].name];
+        for (var i = 0; i < chart.displayedNodes.length; i++) {
+            for (var nbName in chart.displayedNodes[i].nbScores) {
+                if (chart.displayedNodes[i].nbScores[nbName] > maxNbScore)
+                    maxNbScore = chart.displayedNodes[i].nbScores[nbName];
+                else if (chart.displayedNodes[i].nbScores[nbName] < minNbScore)
+                    minNbScore = chart.displayedNodes[i].nbScores[nbName];
+            }
+        }
+        chart.colorScale.domain([minNbScore, maxNbScore]);
+        //If the node that was zoomed disappeared from main vis, we need to calculate its deteailed data additionaly
         if (chart.zoomed) {
             var d = chart.clicked;
             var parsed = DataProcessor.parse_totals_data(d.callData, d.smsData, d.btData, chart.startTime, chart.endTime);
@@ -424,6 +436,7 @@ WebChart = (function () {
                     return chart.unzoom_circle();
                 }
         });
+        //Clicking mask for unzoom
         this.web.append("rect").attr("x", -400).attr("y", -400).attr("height", 800).attr("width", 800).style("fill", "#ffffff");
 
 
@@ -476,28 +489,30 @@ WebChart = (function () {
 		.style("font-weight", "bold")
 		.text("?");
 
-        //Draw the web circles  
-        for (level = 0; level < chart.levels; level++) {
-            for (j = 0; j < chart.segments; j++) {
-                var point = chart.points.byLevel[level][j]
-                var nextIdx = j + 1 < chart.segments ? j + 1 : 0;
-                var nextPoint = chart.points.byLevel[level][nextIdx];
-                var nextPoint1Control = { x: 0, y: 0 }, nextPoint2Control = { x: 0, y: 0 };
-                var getRandomArbitary = function (min, max) {
-                    return Math.random() * (max - min) + min;
-                }
-                nextPoint1Control.x = point.x * getRandomArbitary(0.85, 0.97);
-                nextPoint1Control.y = point.y * getRandomArbitary(0.85, 0.97);
-                nextPoint2Control.x = nextPoint.x * getRandomArbitary(0.85, 0.97);
-                nextPoint2Control.y = nextPoint.y * getRandomArbitary(0.85, 0.97);
+        this.draw_connections();
 
-                this.web.append("path")
-                    .attr("d", " M " + point.x + "," + point.y + " C " + nextPoint1Control.x + "," + nextPoint1Control.y + " "
-                    + nextPoint2Control.x + "," + nextPoint2Control.y + " " + nextPoint.x + "," + nextPoint.y)
-                    .attr("fill", "none")
-                    .style("stroke", "#055");
-            }
-        }
+        //Draw the web circles  
+        //for (level = 0; level < chart.levels; level++) {
+        //    for (j = 0; j < chart.segments; j++) {
+        //        var point = chart.points.byLevel[level][j]
+        //        var nextIdx = j + 1 < chart.segments ? j + 1 : 0;
+        //        var nextPoint = chart.points.byLevel[level][nextIdx];
+        //        var nextPoint1Control = { x: 0, y: 0 }, nextPoint2Control = { x: 0, y: 0 };
+        //        var getRandomArbitary = function (min, max) {
+        //            return Math.random() * (max - min) + min;
+        //        }
+        //        nextPoint1Control.x = point.x * getRandomArbitary(0.85, 0.97);
+        //        nextPoint1Control.y = point.y * getRandomArbitary(0.85, 0.97);
+        //        nextPoint2Control.x = nextPoint.x * getRandomArbitary(0.85, 0.97);
+        //        nextPoint2Control.y = nextPoint.y * getRandomArbitary(0.85, 0.97);
+
+        //        this.web.append("path")
+        //            .attr("d", " M " + point.x + "," + point.y + " C " + nextPoint1Control.x + "," + nextPoint1Control.y + " "
+        //            + nextPoint2Control.x + "," + nextPoint2Control.y + " " + nextPoint.x + "," + nextPoint.y)
+        //            .attr("fill", "none")
+        //            .style("stroke", "#055");
+        //    }
+        //}
         //Draw the web radial lines
         for (segment = 0; segment < chart.segments; segment++) {
             console.debug(chart.points.bySegment[segment]);
@@ -516,20 +531,6 @@ WebChart = (function () {
             .attr("width", 120)
             .attr("height", 200);
 
-        var getPoints = function () {
-            var result = [];
-            for (var i = 0 ; i < chart.segments ; i++)
-                result.push({
-                    scale: d3.scale.linear().domain([chart.minFriendship, chart.maxFriendship]).range([chart.points.byLevel[chart.levels - 1][i], chart.points.byLevel[0][i]]),
-                    pointa: chart.points.byLevel[chart.levels - 1][i], pointb: chart.points.byLevel[0][i]
-                });
-            return result;
-        };
-        chart.friendScales = getPoints();
-        chart.friendScales.randomize();
-        this.displayedNodes.forEach(function (d, i) {
-            d.friendScale = chart.friendScales[i];
-        });
         this.circles.enter().append("circle")
             .attr("r", 0)
             .attr("fill", function (d) {
@@ -542,11 +543,11 @@ WebChart = (function () {
                 return "bubble_" + d.id;
             }).attr("cx", function (d, i) {
                 d.x = d.friendScale.scale(chart.minFriendship).x
-                return d.friendScale.scale(chart.minFriendship).x;
+                return d.x;
             })
             .attr("cy", function (d, i) {
                 d.y = d.friendScale.scale(chart.minFriendship).y
-                return d.friendScale.scale(chart.minFriendship).y;
+                return d.y;
             })
             .on("mouseover", function (d, i) {
                 return chart.show_details(d, i, this);
@@ -562,16 +563,17 @@ WebChart = (function () {
 
         return this.circles.transition().duration(500).attr("r", function (d) {
             return d.radius;
-        }).each("end", function () {
+        })
+        .each("end", function () {
             chart.circles.transition().duration(500).attr("cx", function (d, i) {
                 d.x = d.friendScale.scale(d.friendshipScore).x
-                return d.friendScale.scale(d.friendshipScore).x;
+                return d.x;
             })
             .attr("cy", function (d, i) {
                 d.y = d.friendScale.scale(d.friendshipScore).y
-                return d.friendScale.scale(d.friendshipScore).y;
-            });
-        });
+                return d.y;
+            })            
+        });        
     };
    
     /********************************************************************************
@@ -585,14 +587,16 @@ WebChart = (function () {
 
         this.update_nodes();
         //Rescale the scales
-        this.friendScales.forEach(function (d) {
-            d.scale = d3.scale.linear().domain([chart.minFriendship, chart.maxFriendship]).range([d.pointa, d.pointb]);
-        });
+        //this.friendScales.forEach(function (d) {
+        //    d.scale = d3.scale.linear().domain([chart.minFriendship, chart.maxFriendship]).range([d.pointa, d.pointb]);
+        //});
         this.circles = this.web.selectAll("circle").data(chart.displayedNodes, function (d) {
             return d.id;
         });
         this.circles.exit().transition().duration(500).attr("r", 0).remove();
         
+        this.draw_connections();
+
         chart.circles.enter().append("circle")
             .attr("r", 0)
             .attr("fill", function (d) {
@@ -643,7 +647,10 @@ WebChart = (function () {
                     })
                     .attr("stroke", function (d) {
                         return d3.rgb(chart.colors[d.group]).darker(); });
-            });
+            });     
+
+
+
 
         if (this.zoomed) {
             //Update zoomed views
@@ -687,9 +694,50 @@ WebChart = (function () {
                  return chart.clicked.btStat + " connections";
              });
         }
+
+        this.vis.select("#userAvatarMain").each(function () {
+            this.parentNode.appendChild(this);
+        });
+        return this.web.selectAll("circle").each(function () {
+            this.parentNode.appendChild(this);
+        });
     };
+    
+    /********************************************************************************
+    *   FUNCTION: draw_connections                                                  *
+    *   Draw the connections between the nodes.                                     *   
+    ********************************************************************************/
+    WebChart.prototype.draw_connections = function () {
+        var chart = this;
+        var getRandomArbitary = function (min, max) {
+            return Math.random() * (max - min) + min;
+        }
 
+        //Reset pre-existing connections
+        this.web.selectAll(".connection").remove();
 
+        this.web.selectAll(".connection").data(chart.getConnections(chart.displayedNodes)).enter()
+        .append("path")
+        .attr("class", "connection")
+        .attr("stroke", "#000000")
+        .attr("opacity", function (d) { return chart.colorScale(d.score); })
+        .attr("stroke-width", "1px")
+        .attr("fill", "none")
+        .attr("d", function (d) {
+            var point = chart.locationDictionary[d.a];
+            var nextPoint = chart.locationDictionary[d.b];
+            var nextPoint1Control = { x: 0, y: 0 }, nextPoint2Control = { x: 0, y: 0 };
+            
+            nextPoint1Control.x = point.x * getRandomArbitary(0.85, 0.97);
+            nextPoint1Control.y = point.y * getRandomArbitary(0.85, 0.97);
+            nextPoint2Control.x = nextPoint.x * getRandomArbitary(0.85, 0.97);
+            nextPoint2Control.y = nextPoint.y * getRandomArbitary(0.85, 0.97);
+
+            return " M " + point.x + "," + point.y + " C " + nextPoint1Control.x + "," + nextPoint1Control.y + " "
+                        + nextPoint2Control.x + "," + nextPoint2Control.y + " " + nextPoint.x + "," + nextPoint.y;
+        });
+
+    };
 
     /*******************************************************************************/
     /********************** DETAILS VISUALIZATIONS* ********************************/
@@ -1383,7 +1431,9 @@ WebChart = (function () {
         return this.tooltip.hideTooltip();
     };
 
-    //Auxiliary functions
+    /*******************************************************************************/
+    /*************************** HELPER FUNCTIONS  *********************************/
+    /*******************************************************************************/
     WebChart.prototype.getPoints = function (radius, segments, levels) {
         points = {
             all: [],
@@ -1496,11 +1546,30 @@ WebChart = (function () {
         return force;
     };
 
+    WebChart.prototype.getConnections = function (nodes) {
+        var conns = [];
+
+        for (var i = 0; i < nodes.length; i++) {
+            for (var nb in nodes[i].nbScores) {
+                var exists = false;
+                for (var k = 0; k < conns.length; k++) {
+                    if (conns[k].a == nb) {
+                        exists = true;
+                        break;
+                    }
+                }
+                if (!exists)
+                    conns.push({ a: nodes[i].name, b: nb, score: nodes[i].nbScores[nb] });
+            }         
+        }
+
+        return conns;
+
+    };
+
 
     return WebChart;
 })();
-
-var parseResponse = function (data) { return data; };
 
 root = typeof exports !== "undefined" && exports !== null ? exports : this;
 
