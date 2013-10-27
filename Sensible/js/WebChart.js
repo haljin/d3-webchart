@@ -28,7 +28,7 @@ WebChart = (function () {
         this.friendScales;
         this.unusedScales = [];
         this.colorScale = d3.scale.pow().exponent(0.95).range([0.1, 1]);//"#00000000", "#000000FF"]);
-        this.strokeScale = d3.scale.pow().exponent(0.95).rangeRound([1, 3]).clamp(true);//"#00000000", "#000000FF"]);
+        this.strokeScale = d3.scale.pow().exponent(0.95).rangeRound([2, 4]).clamp(true);//"#00000000", "#000000FF"]);
         this.locationDictionary = {};
 
         //Detailed view layour fields
@@ -377,7 +377,7 @@ WebChart = (function () {
         
         chart.displayedNodes.forEach(function (d, i) {
             d.friendScale = chart.friendScales[i];
-            chart.locationDictionary[d.name] = { x: d.friendScale.scale(d.friendshipScore).x, y: d.friendScale.scale(d.friendshipScore).y };
+            chart.locationDictionary[d.name] = { x: d.friendScale.scale(d.friendshipScore).x, y: d.friendScale.scale(d.friendshipScore).y};
         });
 
 
@@ -509,9 +509,9 @@ WebChart = (function () {
             var start = chart.points.bySegment[segment][0];
             var end = chart.points.bySegment[segment][chart.levels];
             this.web.append("path")
-
-            .attr("d", "M" + start.x + " " + start.y + " L " + end.x + " " + end.y)
-            .style("stroke", "#000")
+                .attr("d", "M" + start.x + " " + start.y + " L " + end.x + " " + end.y)
+                .style("stroke-dasharray", "15 5")
+                .style("stroke", "#000")
             .attr("opacity", 0.5);
         }
         chart.web.append("image")
@@ -541,8 +541,35 @@ WebChart = (function () {
                 return d.y;
             })
             .on("mouseover", function (d, i) {
+                var connected = [d.name];
+                chart.web.selectAll(".connection").transition().duration(500)
+                .attr("stroke-width", function (c) {
+                    if (c.a == d.name)
+                        connected.push(c.b);
+                    else if (c.b == d.name)
+                        connected.push(c.a);
+                    else
+                        return 0 + "px";
+                    //return c.opacity * 2 + "px";
+                    return chart.strokeScale(c.score) + "px";
+                });
+                chart.web.selectAll("circle").transition().duration(500)
+                .attr("opacity", function (circle) {
+                    if (connected.indexOf(circle.name) > -1)
+                        return 1;
+                    else
+                        return 0.05;
+                });
                 return chart.show_details(d, i, this);
             }).on("mouseout", function (d, i) {
+                chart.web.selectAll(".connection").transition().duration(500)
+                    .attr("stroke-width", function (c) {
+                        return chart.strokeScale(c.score) + "px";
+                    });
+                chart.web.selectAll("circle").transition().duration(500)
+                .attr("opacity", function (circle) {
+                    return 1;                    
+                });
                 return chart.hide_details(d, i, this);
             }).on("click", function (d, i) {
                 if (!chart.inTransition && !chart.zoomed) {
@@ -613,9 +640,36 @@ WebChart = (function () {
                 d.y = d.friendScale.scale(chart.minFriendship).y
                 return d.friendScale.scale(chart.minFriendship).y;
             })
-            .on("mouseover", function (d, i) {
+             .on("mouseover", function (d, i) {
+                var connected = [d.name];
+                chart.web.selectAll(".connection").transition().duration(500)
+                .attr("stroke-width", function (c) {
+                    if (c.a == d.name)
+                        connected.push(c.b);
+                    else if (c.b == d.name)
+                        connected.push(c.a);
+                    else
+                        return 0 + "px";
+                    //return c.opacity * 2 + "px";
+                    return chart.strokeScale(c.score) + "px";
+                });
+                chart.web.selectAll("circle").transition().duration(500)
+                .attr("opacity", function (circle) {
+                    if (connected.indexOf(circle.name) > -1)
+                        return 1;
+                    else
+                        return 0.05;
+                });
                 return chart.show_details(d, i, this);
             }).on("mouseout", function (d, i) {
+                chart.web.selectAll(".connection").transition().duration(500)
+                    .attr("stroke-width", function (c) {
+                        return chart.strokeScale(c.score) + "px";
+                    });
+                chart.web.selectAll("circle").transition().duration(500)
+                .attr("opacity", function (circle) {
+                    return 1;                    
+                });
                 return chart.hide_details(d, i, this);
             }).on("click", function (d, i) {
                 if (!chart.inTransition && !chart.zoomed) {
@@ -709,7 +763,9 @@ WebChart = (function () {
         var getRandomArbitary = function (min, max) {
             return Math.random() * (max - min) + min;
         }
-
+        var eucDist = function (a, b) {
+            return Math.sqrt(Math.pow(b.x - a.x, 2) + Math.pow(b.y - a.y, 2));
+        }
         
 
         this.web.selectAll(".connection").data(chart.getConnections(chart.displayedNodes)).enter()
@@ -717,22 +773,41 @@ WebChart = (function () {
         .attr("class", "connection")
         .attr("stroke", "#000000")
         .attr("opacity", 0)
-        .attr("stroke-width", function (d) { return chart.strokeScale(d.score) + "px"; })
+        .attr("stroke-width", function (d) {
+            //d["opacity"] = chart.strokeScale(d.score);
+            return chart.strokeScale(d.score) + "px";
+        })
         .attr("fill", "none")
         .attr("d", function (d) {
             var point = chart.locationDictionary[d.a];
             var nextPoint = chart.locationDictionary[d.b];
             var nextPoint1Control = { x: 0, y: 0 }, nextPoint2Control = { x: 0, y: 0 };
-            
-            nextPoint1Control.x = point.x * getRandomArbitary(0.85, 0.97);
-            nextPoint1Control.y = point.y * getRandomArbitary(0.85, 0.97);
-            nextPoint2Control.x = nextPoint.x * getRandomArbitary(0.85, 0.97);
-            nextPoint2Control.y = nextPoint.y * getRandomArbitary(0.85, 0.97);
+            var parallel = { x: nextPoint.y - point.y, y: nextPoint.x - point.x };
+            var dist = eucDist(nextPoint, point);
+            parallel.x /= dist;
+            parallel.y /= dist;
+            var midPoint = { x: point.x + (nextPoint.x - point.x) / 2 - parallel.x, y: point.y + (nextPoint.y - point.y) / 2 + parallel.y },
+                midPoint2 = { x: point.x + (nextPoint.x - point.x) / 2 + parallel.x, y: point.y + (nextPoint.y - point.y) / 2 - parallel.y };
+            var modifier = 1;
+            if (eucDist(midPoint, { x: 0, y: 0 }) > eucDist(midPoint2, { x: 0, y: 0 }))
+                modifier = -1;
+
+            nextPoint1Control.x = point.x + (nextPoint.x - point.x) / 3 - modifier * getRandomArbitary(20, 45) * parallel.x;
+            nextPoint1Control.y = point.y + (nextPoint.y - point.y) / 3 + modifier * getRandomArbitary(20, 45) * parallel.y;
+            nextPoint2Control.x = point.x + (nextPoint.x - point.x) / 3 * 2 - modifier * getRandomArbitary(20, 45) * parallel.x;
+            nextPoint2Control.y = point.y + (nextPoint.y - point.y) / 3 * 2 + modifier * getRandomArbitary(20, 45) * parallel.y;
+            //if (modifier == 1)
+            //    chart.web.selectAll(".debug").data([1]).enter().append("circle").attr("cx", midPoint.x).attr("cy", midPoint.y).attr("r",5).attr("fill", "#FF0000");
+            //else
+            //    chart.web.selectAll(".debug").data([1]).enter().append("circle").attr("cx", midPoint2.x).attr("cy", midPoint2.y).attr("r",5).attr("fill", "#0000FF");
+
 
             return " M " + point.x + "," + point.y + " C " + nextPoint1Control.x + "," + nextPoint1Control.y + " "
                         + nextPoint2Control.x + "," + nextPoint2Control.y + " " + nextPoint.x + "," + nextPoint.y;
         })
-        .transition().duration(500).attr("opacity", function (d) { return chart.colorScale(d.score); });
+        .transition().duration(500).attr("opacity", function (d) { 
+            
+            return chart.colorScale(d.score);; });
         //Put circles on top
         this.vis.select("#userAvatarMain").each(function () {
             this.parentNode.appendChild(this);
@@ -1409,18 +1484,18 @@ WebChart = (function () {
             rest = rest % 60;
             d3.select(element).attr("stroke", "black");
             content = "<span class=\"name\">ID:</span><span class=\"value\"> " + data.name + "</span><br/>";
-            content += "<span class=\"name\">Calls: </span><span class=\"value\">" + hours
-            if (minutes < 10)
-                content += ":0" + minutes;
-            else
-                content += ":" + minutes;
-            if (rest < 10)
-                content += ":0" + rest + " time in call.</span><br/>";
-            else
-                content += ":" + rest + " time in call.</span><br/>";
+            //content += "<span class=\"name\">Calls: </span><span class=\"value\">" + hours
+            //if (minutes < 10)
+            //    content += ":0" + minutes;
+            //else
+            //    content += ":" + minutes;
+            //if (rest < 10)
+            //    content += ":0" + rest + " time in call.</span><br/>";
+            //else
+            //    content += ":" + rest + " time in call.</span><br/>";
 
-            content += "<span class=\"name\">Sms: </span><span class=\"value\">" + data.smsStat + " messages.</span><br/>";
-            content += "<span class=\"name\">Bluetooth: </span><span class=\"value\">" + data.btStat + " connections.</span><br/>";
+            //content += "<span class=\"name\">Sms: </span><span class=\"value\">" + data.smsStat + " messages.</span><br/>";
+            //content += "<span class=\"name\">Bluetooth: </span><span class=\"value\">" + data.btStat + " connections.</span><br/>";
             return this.tooltip.showTooltip(content, d3.event);
         }
     };

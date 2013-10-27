@@ -27,10 +27,10 @@ footer {
 	left: 100px;
   -moz-border-radius:5px;
 	border-radius: 5px;
-  border: 2px solid #000;
+  border: 1px solid #000;
 	/* background: #222222; */
   background: #fff;
-	opacity: .9;
+	opacity: .8;
 	/* color: #eeeeee; */
   color: black;
 	padding: 10px;
