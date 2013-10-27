@@ -27,7 +27,8 @@ WebChart = (function () {
         this.radius_scale;
         this.friendScales;
         this.unusedScales = [];
-        this.colorScale = d3.scale.linear().range([0, 1]);//"#00000000", "#000000FF"]);
+        this.colorScale = d3.scale.pow().exponent(0.95).range([0.1, 1]);//"#00000000", "#000000FF"]);
+        this.strokeScale = d3.scale.pow().exponent(0.95).rangeRound([1, 3]).clamp(true);//"#00000000", "#000000FF"]);
         this.locationDictionary = {};
 
         //Detailed view layour fields
@@ -379,17 +380,7 @@ WebChart = (function () {
             chart.locationDictionary[d.name] = { x: d.friendScale.scale(d.friendshipScore).x, y: d.friendScale.scale(d.friendshipScore).y };
         });
 
-        //TODO: Replace this with a function that finds all the non-duplicate connections, might as well find max/min when at it
-        var maxNbScore = 0, minNbScore = chart.displayedNodes[0].nbScores[chart.displayedNodes[1].name];
-        for (var i = 0; i < chart.displayedNodes.length; i++) {
-            for (var nbName in chart.displayedNodes[i].nbScores) {
-                if (chart.displayedNodes[i].nbScores[nbName] > maxNbScore)
-                    maxNbScore = chart.displayedNodes[i].nbScores[nbName];
-                else if (chart.displayedNodes[i].nbScores[nbName] < minNbScore)
-                    minNbScore = chart.displayedNodes[i].nbScores[nbName];
-            }
-        }
-        chart.colorScale.domain([minNbScore, maxNbScore]);
+
         //If the node that was zoomed disappeared from main vis, we need to calculate its deteailed data additionaly
         if (chart.zoomed) {
             var d = chart.clicked;
@@ -489,8 +480,7 @@ WebChart = (function () {
 		.style("font-weight", "bold")
 		.text("?");
 
-        this.draw_connections();
-
+    
         //Draw the web circles  
         //for (level = 0; level < chart.levels; level++) {
         //    for (j = 0; j < chart.segments; j++) {
@@ -521,7 +511,8 @@ WebChart = (function () {
             this.web.append("path")
 
             .attr("d", "M" + start.x + " " + start.y + " L " + end.x + " " + end.y)
-            .style("stroke", "#000");
+            .style("stroke", "#000")
+            .attr("opacity", 0.5);
         }
         chart.web.append("image")
             .attr("id", "userAvatarMain")
@@ -534,8 +525,8 @@ WebChart = (function () {
         this.circles.enter().append("circle")
             .attr("r", 0)
             .attr("fill", function (d) {
-                return chart.clusterColors[d.cluster];
-                //return chart.colors[d.group];
+                //return chart.clusterColors[d.cluster];
+                return chart.colors[d.group];
             })
             .attr("stroke-width", 2).attr("stroke", function (d) {
                 return d3.rgb(chart.colors[d.group]).darker();
@@ -572,7 +563,13 @@ WebChart = (function () {
             .attr("cy", function (d, i) {
                 d.y = d.friendScale.scale(d.friendshipScore).y
                 return d.y;
-            })            
+            })
+            .each("end", function () {
+                //Reset pre-existing connections
+                chart.web.selectAll(".connection").remove();
+
+                chart.draw_connections();
+            });
         });        
     };
    
@@ -594,14 +591,15 @@ WebChart = (function () {
             return d.id;
         });
         this.circles.exit().transition().duration(500).attr("r", 0).remove();
-        
-        this.draw_connections();
+        //Reset pre-existing connections
+        this.web.selectAll(".connection").remove();
+      
 
         chart.circles.enter().append("circle")
             .attr("r", 0)
             .attr("fill", function (d) {
-                return chart.clusterColors[d.cluster];
-                //return chart.colors[d.group];
+                //return chart.clusterColors[d.cluster];
+                return chart.colors[d.group];
             })
             .attr("stroke-width", 2).attr("stroke", function (d) {
                 return d3.rgb(chart.colors[d.group]).darker();
@@ -642,11 +640,15 @@ WebChart = (function () {
                         if (chart.zoomed)
                             return d3.rgb(chart.colors[d.group]).darker().darker().darker();
                         else
-                            return chart.clusterColors[d.cluster];
-                        //return chart.colors[d.group]; 
+                            //return chart.clusterColors[d.cluster];
+                        return chart.colors[d.group]; 
                     })
                     .attr("stroke", function (d) {
-                        return d3.rgb(chart.colors[d.group]).darker(); });
+                        return d3.rgb(chart.colors[d.group]).darker();
+                    })
+                .each("end", function () {
+                    chart.draw_connections();
+                });
             });     
 
 
@@ -695,12 +697,7 @@ WebChart = (function () {
              });
         }
 
-        this.vis.select("#userAvatarMain").each(function () {
-            this.parentNode.appendChild(this);
-        });
-        return this.web.selectAll("circle").each(function () {
-            this.parentNode.appendChild(this);
-        });
+
     };
     
     /********************************************************************************
@@ -713,15 +710,14 @@ WebChart = (function () {
             return Math.random() * (max - min) + min;
         }
 
-        //Reset pre-existing connections
-        this.web.selectAll(".connection").remove();
+        
 
         this.web.selectAll(".connection").data(chart.getConnections(chart.displayedNodes)).enter()
         .append("path")
         .attr("class", "connection")
         .attr("stroke", "#000000")
-        .attr("opacity", function (d) { return chart.colorScale(d.score); })
-        .attr("stroke-width", "1px")
+        .attr("opacity", 0)
+        .attr("stroke-width", function (d) { return chart.strokeScale(d.score) + "px"; })
         .attr("fill", "none")
         .attr("d", function (d) {
             var point = chart.locationDictionary[d.a];
@@ -735,6 +731,14 @@ WebChart = (function () {
 
             return " M " + point.x + "," + point.y + " C " + nextPoint1Control.x + "," + nextPoint1Control.y + " "
                         + nextPoint2Control.x + "," + nextPoint2Control.y + " " + nextPoint.x + "," + nextPoint.y;
+        })
+        .transition().duration(500).attr("opacity", function (d) { return chart.colorScale(d.score); });
+        //Put circles on top
+        this.vis.select("#userAvatarMain").each(function () {
+            this.parentNode.appendChild(this);
+        });
+        this.web.selectAll("circle").each(function () {
+            this.parentNode.appendChild(this);
         });
 
     };
@@ -1548,23 +1552,57 @@ WebChart = (function () {
 
     WebChart.prototype.getConnections = function (nodes) {
         var conns = [];
+        var chart = this;
 
         for (var i = 0; i < nodes.length; i++) {
             for (var nb in nodes[i].nbScores) {
                 var exists = false;
                 for (var k = 0; k < conns.length; k++) {
-                    if (conns[k].a == nb) {
+                    if (conns[k].a == nb && conns[k].b == nodes[i].name) {
                         exists = true;
                         break;
                     }
                 }
-                if (!exists)
+                if (!exists && nodes[i].nbScores[nb] > 0)
                     conns.push({ a: nodes[i].name, b: nb, score: nodes[i].nbScores[nb] });
             }         
         }
+        if (conns.length > 0) {
+            var maxNbScore = 0, minNbScore = conns[0].score, avgNbScore = { score: 0, count: 0 };
+            for (var i = 0; i < conns.length; i++) {
+                if (conns[i].score > maxNbScore)
+                    maxNbScore = conns[i].score;
+                if (conns[i].score > 0) {
+                    avgNbScore.score += conns[i].score;
+                    avgNbScore.count++;
+                }
+            }
 
+            var stdDev = 0, avg = avgNbScore.score / avgNbScore.count
+            for (var i = 0; i < conns.length; i++) {
+                if (conns[i].score > 0)
+                    stdDev += Math.pow(conns[i].score - avg, 2);
+            }
+            stdDev *= (1 / (avgNbScore.count - 1))
+            stdDev = Math.sqrt(stdDev);
+
+            conns.sort(function (a, b) { return b.score - a.score });
+            
+            var cut;
+            for (cut = 0; cut < conns.length; cut++) 
+                if (conns[cut].score < avg) break;
+            conns = conns.splice(0, cut);
+            //for (var i = 0; i < conns.length; i++) {
+            //    if (conns[i].score < avg)
+            //        conns[i].score = 0;
+                
+            //}
+
+            chart.colorScale.domain([avg, maxNbScore]);
+            chart.strokeScale.domain([avg, maxNbScore]);
+
+        }
         return conns;
-
     };
 
 
