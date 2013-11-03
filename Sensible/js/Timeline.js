@@ -21,11 +21,12 @@ Timeline = (function () {
         var toLabel = ["call", "sms", "bt"]
         var barPadding = 1;
         var data = DataProcessor.parse_timeline_data(chart.data);
-        
+        //TODO: HARDCODED BLAST TO THE PAST
         var date = new Date(Date.now()), ending = new Date(Date.now());
         ending.setHours(0);
         ending.setMinutes(0);
-        var starting = new Date(date.setMonth(date.getMonth() - 7))
+        var starting = new Date(date.setMonth(date.getMonth() - 7));
+        //var starting = new Date(1349958465000), ending = new Date(1369239142000);
 
         var n = 3, // number of layers
            m = data[2].length; // number of samples per layer
