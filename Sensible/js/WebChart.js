@@ -23,7 +23,7 @@ WebChart = (function () {
         this.web = null;
         this.segments = 16;
         this.levels = 3;
-        this.points = this.getPoints((this.width - 100) /3.5, this.segments, this.levels);
+        this.points = this.getPoints((this.width - 100) / 3.5, this.segments, this.levels);
         this.radius_scale;
         this.friendScales;
         this.unusedScales = [];
@@ -49,12 +49,9 @@ WebChart = (function () {
         this.btData;
         this.nodes = [];
         this.displayedNodes = [];
-        this.maxCallScore = 0;
-        this.maxSmsScore = 0;
-        this.maxBtScore = 0;
+        this.maxScores = { call: 0, sms: 0, bt: 0, total: 0 };
+        this.minScores = { call: 0, sms: 0, bt: 0, total: 0 };
         this.totalScore = 0;
-        this.maxFriendship = 0;
-        this.minFriendship = 0;
         this.createNode = function (id, name) {
             return {
                 id: id,
@@ -81,7 +78,7 @@ WebChart = (function () {
                 friendshipScore: 0,     //Indicate how good of a friend is he
                 lastContact: 0,
                 friendScale: null,
-
+                subnodes: []
             }
         }
 
@@ -98,12 +95,12 @@ WebChart = (function () {
         var date = new Date(Date.now());
         var obj = this;
         //TODO: HARDCODED BLAST TO THE PAST
-        var starting = /*new Date(1349958465000)*/date.setMonth(date.getMonth() - 7)
-                       
+        var starting = new Date(1349958465000);//date.setMonth(date.getMonth() - 7)
+
 
 
         setTimeout(function () {
-            obj.load_data(starting, /*new Date(1369239142000));*/Date.now());
+            obj.load_data(starting, new Date(1369239142000));//Date.now());
         }, 1000);
     };
 
@@ -157,7 +154,7 @@ WebChart = (function () {
     *   FUNCTION: create_nodes                                                      *
     *   Create the data nodes from the loaded data. Perform all pre-computation.    *   
     ********************************************************************************/
-    WebChart.prototype.create_nodes = function () {        
+    WebChart.prototype.create_nodes = function () {
         var chart = this;
         var namesDict = {};     //Dictionary to store indices of nodes in the array, for faster data insertion        
         var extractNumber = function (hash) {
@@ -184,7 +181,7 @@ WebChart = (function () {
                         namesDict[name] = chart.nodes.length - 1;
                     }
                     else {
-                        chart.nodes[namesDict[name]].callData.push({ timestamp: d.timestamp, score: d.call.duration, stat: d.call.duration});
+                        chart.nodes[namesDict[name]].callData.push({ timestamp: d.timestamp, score: d.call.duration, stat: d.call.duration });
                     }
                 }
             }
@@ -202,12 +199,12 @@ WebChart = (function () {
                 var node;
                 if (namesDict[name] == undefined) {
                     node = chart.createNode(chart.nodes.length, name);
-                    node.smsData.push({ timestamp: d.timestamp, score: 10, stat: 1});
+                    node.smsData.push({ timestamp: d.timestamp, score: 10, stat: 1 });
                     chart.nodes.push(node);
                     namesDict[name] = chart.nodes.length - 1;
                 }
                 else {
-                    chart.nodes[namesDict[name]].smsData.push({ timestamp: d.timestamp, score: 10, stat: 1});
+                    chart.nodes[namesDict[name]].smsData.push({ timestamp: d.timestamp, score: 10, stat: 1 });
                 }
             }
         }
@@ -216,7 +213,7 @@ WebChart = (function () {
         for (var i = 0; i < chart.btData.length; i++) {
             var d = chart.btData[i];
             var neighbouring = [];
-            for(var j = 0; j < d.devices.length; j++) {
+            for (var j = 0; j < d.devices.length; j++) {
                 var name;
                 //TODO: Fake translate between sensible_user_id and phone numbers, must be replaced with real stuff
                 fake.forEach(function (l) {
@@ -229,7 +226,7 @@ WebChart = (function () {
                         node = chart.createNode(chart.nodes.length, name);
                         node.btData.push({ timestamp: d.timestamp, score: 5, stat: 1 });
                         chart.nodes.push(node);
-                        namesDict[name] = chart.nodes.length - 1;                        
+                        namesDict[name] = chart.nodes.length - 1;
                     }
                     else {
                         var score = (chart.nodes[namesDict[name]].lastContact - d.timestamp > 300000) ? 300 : 5;
@@ -247,7 +244,7 @@ WebChart = (function () {
                             chart.nodes[namesDict[neighbouring[curr]]].nbData[neighbouring[other]] = [];
                         chart.nodes[namesDict[neighbouring[curr]]].nbData[neighbouring[other]].push(d.timestamp);
                     }
-                    
+
                 }
             }
         }
@@ -275,25 +272,15 @@ WebChart = (function () {
     *   Update the data nodes in regards to new displayed time period.              *   
     ********************************************************************************/
     WebChart.prototype.update_nodes = function () {
-        var chart = this;        
-        var inWorkHours = function (timestamp) {
-            var d = new Date(timestamp * 1000);
-            if (d.getDay() == 6 || d.getDay() == 5)
-                return false;
-            var result = DataProcessor.get_timeslot(d);
-            return DAYSLOT.EARLYCLASS || DAYSLOT.LATECLASS;
-        }       //Helper function to determine whether timestamp is within class hours
+        var chart = this;
 
         chart.totalScore = 0;
         chart.maxBtScore = 0;
         chart.maxCallScore = 0;
         chart.maxSmsScore = 0;
-        chart.maxFriendship = 0;
-        chart.minFriendship = 0;
-        var max_amount = 0;
         //Calculate scores for all nodes
         for (var i = 0; i < chart.nodes.length; i++) {
-            var d = chart.nodes[i];            
+            var d = chart.nodes[i];
             var toLabel = ["call", "sms", "bt"]
             var maxIndex = 0;
 
@@ -308,7 +295,6 @@ WebChart = (function () {
                 if (d.callData[j].timestamp > chart.startTime) {
                     d.callScore += d.callData[j].score;
                     d.callStat += d.callData[j].stat;
-                    d.friendshipScore += inWorkHours(d.timestamp) ? d.callData[j].score * 0.5 : d.callData[j].score;
                 }
             }
             for (var j = 0; j < d.smsData.length; j++) {
@@ -316,7 +302,6 @@ WebChart = (function () {
                 if (d.smsData[j].timestamp > chart.startTime) {
                     d.smsScore += d.smsData[j].score;
                     d.smsStat += d.smsData[j].stat;
-                    d.friendshipScore += inWorkHours(d.timestamp) ? d.smsData[j].score * 0.5 : d.smsData[j].score;
                 }
             }
             for (var j = 0; j < d.btData.length; j++) {
@@ -324,60 +309,66 @@ WebChart = (function () {
                 if (d.btData[j].timestamp > chart.startTime) {
                     d.btScore += d.btData[j].score;
                     d.btStat += d.btData[j].stat;
-                    d.friendshipScore += inWorkHours(d.timestamp) ? d.btData[j].score * 0.25 : d.btData[j].score;
                 }
             }
-            
+
             var scores = [d.callScore, d.smsScore, d.btScore];
             maxIndex = scores.indexOf(Math.max.apply(null, scores));
             d.value = d.callScore + d.smsScore + d.btScore;
             d.group = toLabel[maxIndex];
 
             chart.totalScore += d.callScore + d.smsScore + d.btScore;
-            max_amount = d.value > max_amount ? d.value : max_amount;
-            chart.maxBtScore = d.btScore > chart.maxBtScore ? d.btScore : chart.maxBtScore;
-            chart.maxCallScore = d.callScore > chart.maxCallScore ? d.callScore : chart.maxCallScore;
-            chart.maxSmsScore = d.smsScore > chart.maxSmsScore ? d.smsScore : chart.maxSmsScore;
-            chart.maxFriendship = d.friendshipScore > chart.maxFriendship ? d.friendshipScore : chart.maxFriendship;
-            chart.minFriendship = d.friendshipScore < chart.minFriendship ? d.friendshipScore : chart.minFriendship;
-        }        
+            chart.maxScores.total = d.value > chart.maxScores.total ? d.value : chart.maxScores.total;
+            chart.minScores.total = (d.value < chart.minScores.total || i == 0) ? d.value : chart.minScores.total;
+            chart.maxScores.bt = d.btScore > chart.maxScores.bt ? d.btScore : chart.maxScores.bt;
+            chart.maxScores.call = d.callScore > chart.maxScores.call ? d.callScore : chart.maxScores.call;
+            chart.maxScores.sms = d.smsScore > chart.maxScores.sms ? d.smsScore : chart.maxScores.sms;
+            chart.minScores.bt = (d.value < chart.minScores.bt || i == 0) ? d.value : chart.minScores.bt;
+            chart.minScores.call = (d.value < chart.minScores.call || i == 0) ? d.value : chart.minScores.call;
+            chart.minScores.sms = (d.value < chart.minScores.sms || i == 0) ? d.value : chart.minScores.sms;
+        }
 
         //Update scales
-        chart.radius_scale = d3.scale.pow().exponent(0.5).domain([0, max_amount]).range([10, 50]);
         chart.friendScales.forEach(function (d) {
-            d.scale = d3.scale.linear().domain([chart.minFriendship, chart.maxFriendship]).range([d.pointa, d.pointb]);
+            d.scale = d3.scale.linear().domain([chart.minScores.total, chart.maxScores.total]).range([d.pointa, d.pointb]);
+            d.scales = {
+                bt: d3.scale.linear().domain([chart.minScores.bt, chart.maxScores.bt]).range([d.pointa, d.pointb]),
+                sms: d3.scale.linear().domain([chart.minScores.sms, chart.maxScores.sms]).range([d.pointa, d.pointb]),
+                call: d3.scale.linear().domain([chart.minScores.call, chart.maxScores.call]).range([d.pointa, d.pointb])
+            };
         });
 
         chart.nodes.sort(function (a, b) {
             return b.value - a.value;
-        });     
+        });
 
         //Cut off the top 16 nodes, less if there would be nodes of value 0
         var slice = 0
         for (var i = 0; i < 16; i++) {
             if (chart.nodes[i].value == 0) break;
-            slice = i+1;
+            slice = i + 1;
         }
         chart.displayedNodes = chart.nodes.slice(0, slice);
 
         for (var i = 0; i < chart.displayedNodes.length; i++) {
             var d = chart.displayedNodes[i];
-            d.radius = chart.radius_scale(d.value)
+            d.radius = 20;
             var parsed = DataProcessor.parse_totals_data(d.callData, d.smsData, d.btData, chart.startTime, chart.endTime);
             d.nbScores = DataProcessor.parse_nb_data(d, chart.displayedNodes, chart.startTime, chart.endTime);
             d.totalsData = parsed.totals;
             d.binsData = parsed.bins;
+            
+
         }
 
-        var clusters = clusterfck.hcluster(webchart.displayedNodes, function (a, b) { return 1 / a.nbScores[b.name] }, clusterfck.AVERAGE_LINKAGE)
-        for (var i = 0; i < clusters.length; i++) {
-            chart.parseClusters(clusters[i], i);
-        }
         chart.displayedNodes = chart.placeGreedy();
-        
+
         chart.displayedNodes.forEach(function (d, i) {
             d.friendScale = chart.friendScales[i];
-            chart.locationDictionary[d.name] = { x: d.friendScale.scale(d.friendshipScore).x, y: d.friendScale.scale(d.friendshipScore).y};
+            chart.locationDictionary[d.name] = { x: d.friendScale.scale(d.value).x, y: d.friendScale.scale(d.value).y };
+            d.subnodes.push({ label: "bt", radius: d.radius, score: d.btScore, scale: d.friendScale.scales.bt });
+            d.subnodes.push({ label: "call", radius: d.radius, score: d.callScore, scale: d.friendScale.scales.call });
+            d.subnodes.push({ label: "sms", radius: d.radius, score: d.smsScore, scale: d.friendScale.scales.sms });
         });
 
 
@@ -417,10 +408,10 @@ WebChart = (function () {
 
         this.web = this.vis.append("g").attr("id", "Web");
         this.details = this.vis.append("g").attr("id", "Details");
-        this.circles = this.web.selectAll("circle").data(this.displayedNodes, function (d) {
-            return d.id;
-        });
-        this.web.attr("transform", "translate(" + chart.center.x + ", " + (chart.center.y) + ")").on("click", function (d, i) {
+
+
+
+        this.web.attr("transform", "translate(" + chart.center.x + ", " + chart.center.y + ")").on("click", function (d, i) {
             if (!chart.inTransition)
                 if (chart.zoomed) {
                     chart.inTransition = true;
@@ -438,16 +429,14 @@ WebChart = (function () {
         var group = this.details.append("g")
         .attr("id", "button-help")
 		.on("click", function () {
-		    if(help==false && !chart.zoomed)
-		    {
+		    if (help == false && !chart.zoomed) {
 		        chart.zoomed = true;
 		        Help.draw_help();
 
 		        help = true;
 		        button_text.text("x");
 		    }
-		    else if (help == true)
-		    {
+		    else if (help == true) {
 		        chart.zoomed = false;
 		        Help.undraw_help();
 		        help = false;
@@ -480,32 +469,9 @@ WebChart = (function () {
 		.style("font-weight", "bold")
 		.text("?");
 
-    
-        //Draw the web circles  
-        //for (level = 0; level < chart.levels; level++) {
-        //    for (j = 0; j < chart.segments; j++) {
-        //        var point = chart.points.byLevel[level][j]
-        //        var nextIdx = j + 1 < chart.segments ? j + 1 : 0;
-        //        var nextPoint = chart.points.byLevel[level][nextIdx];
-        //        var nextPoint1Control = { x: 0, y: 0 }, nextPoint2Control = { x: 0, y: 0 };
-        //        var getRandomArbitary = function (min, max) {
-        //            return Math.random() * (max - min) + min;
-        //        }
-        //        nextPoint1Control.x = point.x * getRandomArbitary(0.85, 0.97);
-        //        nextPoint1Control.y = point.y * getRandomArbitary(0.85, 0.97);
-        //        nextPoint2Control.x = nextPoint.x * getRandomArbitary(0.85, 0.97);
-        //        nextPoint2Control.y = nextPoint.y * getRandomArbitary(0.85, 0.97);
-
-        //        this.web.append("path")
-        //            .attr("d", " M " + point.x + "," + point.y + " C " + nextPoint1Control.x + "," + nextPoint1Control.y + " "
-        //            + nextPoint2Control.x + "," + nextPoint2Control.y + " " + nextPoint.x + "," + nextPoint.y)
-        //            .attr("fill", "none")
-        //            .style("stroke", "#055");
-        //    }
-        //}
         //Draw the web radial lines
         for (segment = 0; segment < chart.segments; segment++) {
-            console.debug(chart.points.bySegment[segment]);
+            //console.debug(chart.points.bySegment[segment]);
             var start = chart.points.bySegment[segment][0];
             var end = chart.points.bySegment[segment][chart.levels];
             this.web.append("path")
@@ -522,91 +488,107 @@ WebChart = (function () {
             .attr("width", 120)
             .attr("height", 200);
 
-        this.circles.enter().append("circle")
+        this.circles = this.web.selectAll(".person").data(this.displayedNodes, function (d) {
+            return d.id;
+        }).enter().append("g")
+        .attr("class", "person")
+        //.attr("transform", function (d) {
+        //    return "translate(" + d.friendScale.scale(chart.minScores.total).x + "," + d.friendScale.scale(chart.minScores.total).y + ")"
+        //})
+        .on("mouseover", function (d, i) {
+            return chart.show_details(d, i, this);
+        })
+        .on("mouseout", function (d, i) {
+            return chart.hide_details(d, i, this);
+        });
+
+
+
+        this.circles.selectAll("circle").data(function (d) {
+            return d.subnodes;
+        })
+            .enter()
+            .append("circle")
             .attr("r", 0)
+            .attr("cx", function (d) { return d.scale(chart.minScores[d.label]).x; })
+            .attr("cy", function (d) { return d.scale(chart.minScores[d.label]).y; })
             .attr("fill", function (d) {
                 //return chart.clusterColors[d.cluster];
-                return chart.colors[d.group];
+                return chart.colors[d.label];
             })
             .attr("stroke-width", 2).attr("stroke", function (d) {
-                return d3.rgb(chart.colors[d.group]).darker();
+                return d3.rgb(chart.colors[d.label]).darker();
             }).attr("id", function (d) {
-                return "bubble_" + d.id;
-            }).attr("cx", function (d, i) {
-                d.x = d.friendScale.scale(chart.minFriendship).x
-                return d.x;
-            })
-            .attr("cy", function (d, i) {
-                d.y = d.friendScale.scale(chart.minFriendship).y
-                return d.y;
-            })
-            .on("mouseover", function (d, i) {
-                var connected = [d.name];
-                chart.web.selectAll(".connection").transition().duration(500)
-                .attr("stroke-width", function (c) {
-                    if (c.a == d.name)
-                        connected.push(c.b);
-                    else if (c.b == d.name)
-                        connected.push(c.a);
-                    else
-                        return 0 + "px";
-                    //return c.opacity * 2 + "px";
-                    return chart.strokeScale(c.score) + "px";
-                });
-                chart.web.selectAll("circle").transition().duration(500)
-                .attr("opacity", function (circle) {
-                    if (connected.indexOf(circle.name) > -1)
-                        return 1;
-                    else
-                        return 0.05;
-                });
-                return chart.show_details(d, i, this);
-            }).on("mouseout", function (d, i) {
-                chart.web.selectAll(".connection").transition().duration(500)
-                    .attr("stroke-width", function (c) {
-                        return chart.strokeScale(c.score) + "px";
-                    });
-                chart.web.selectAll("circle").transition().duration(500)
-                .attr("opacity", function (circle) {
-                    return 1;                    
-                });
-                return chart.hide_details(d, i, this);
-            }).on("click", function (d, i) {
-                if (!chart.inTransition && !chart.zoomed) {
-                    chart.inTransition = true;
-                    chart.hide_details(d, i, this);
-                    return chart.zoom_circle(d);
-                }
+                return "bubble_" + d.label;
             });
 
-        return this.circles.transition().duration(500).attr("r", function (d) {
-            return d.radius;
-        })
-        .each("end", function () {
-            chart.circles.transition().duration(500).attr("cx", function (d, i) {
-                d.x = d.friendScale.scale(d.friendshipScore).x
-                return d.x;
-            })
-            .attr("cy", function (d, i) {
-                d.y = d.friendScale.scale(d.friendshipScore).y
-                return d.y;
-            })
-            .each("end", function () {
-                //Reset pre-existing connections
-                chart.web.selectAll(".connection").remove();
 
-                chart.draw_connections();
+
+
+        this.web.selectAll(".person")
+        .each(function (grp) {
+            var circles = d3.select(this).selectAll("circle").data();
+            var radScale = d3.scale.linear().domain([0, grp.value]).range([5, 20]).clamp(true);
+
+
+            for (var i = 0; i < circles.length; ++i) {
+                circles[i]["x"] = circles[i].scale(circles[i].score).x;
+                circles[i]["y"] = circles[i].scale(circles[i].score).y;
+            }
+
+            var parallel = WebChart.getParallel(grp.friendScale.pointa, grp.friendScale.pointb);
+           
+            circles[0].radius = radScale(grp.btScore);
+            circles[1].radius = radScale(grp.callScore);
+            circles[2].radius = radScale(grp.smsScore);
+
+
+            var circleDistance = WebChart.euclideanDistance(circles[0], circles[1]), idealDistance = circles[0].radius + circles[1].radius;
+
+            if (circleDistance < idealDistance) {
+                circles[1].x += parallel.x * Math.sqrt(Math.pow(idealDistance, 2) - Math.pow(circleDistance, 2))
+                circles[1].y += parallel.y * Math.sqrt(Math.pow(idealDistance, 2) - Math.pow(circleDistance, 2))
+
+            }
+            circleDistance = WebChart.euclideanDistance(circles[0], circles[2])
+            circleDistance = WebChart.euclideanDistance(circles[0], circles[1]), idealDistance = circles[0].radius + circles[2].radius;
+            if (circleDistance < idealDistance) {
+                circles[2].x -= parallel.x * Math.sqrt(Math.pow(idealDistance, 2) - Math.pow(circleDistance, 2))
+                circles[2].y -= parallel.y * Math.sqrt(Math.pow(idealDistance, 2) - Math.pow(circleDistance, 2))
+
+            }
+            circleDistance = WebChart.euclideanDistance(circles[1], circles[2])
+            circleDistance = WebChart.euclideanDistance(circles[0], circles[1]), idealDistance = circles[1].radius + circles[2].radius;
+            if (circleDistance < idealDistance) {
+                circles[2].x -= parallel.x * Math.sqrt(Math.pow(idealDistance, 2) - Math.pow(circleDistance, 2))
+                circles[2].y -= parallel.y * Math.sqrt(Math.pow(idealDistance, 2) - Math.pow(circleDistance, 2))
+
+            }
+       
+            d3.select(this).selectAll("circle").transition().duration(500).attr("r", function (d) {
+                return d.radius;
+            }).each("end", function () {
+                
+
+                d3.select(this).transition().duration(500)
+                .attr("cx", function (d) {
+                    return d.x;
+                })
+                .attr("cy", function (d) { return d.y; })
             });
-        });        
+
+        });
+
+    
     };
-   
+
     /********************************************************************************
     *   FUNCTION: update_vis                                                        *
     *   Update the drawn visualization, based on the time period change.            *   
     ********************************************************************************/
     WebChart.prototype.update_vis = function () {
         var chart = this;
-        if(chart.zoomed)
+        if (chart.zoomed)
             var oldtotals = this.clicked.totalsData;
 
         this.update_nodes();
@@ -620,7 +602,7 @@ WebChart = (function () {
         this.circles.exit().transition().duration(500).attr("r", 0).remove();
         //Reset pre-existing connections
         this.web.selectAll(".connection").remove();
-      
+
 
         chart.circles.enter().append("circle")
             .attr("r", 0)
@@ -641,69 +623,72 @@ WebChart = (function () {
                 return d.friendScale.scale(chart.minFriendship).y;
             })
              .on("mouseover", function (d, i) {
-                var connected = [d.name];
-                chart.web.selectAll(".connection").transition().duration(500)
-                .attr("stroke-width", function (c) {
-                    if (c.a == d.name)
-                        connected.push(c.b);
-                    else if (c.b == d.name)
-                        connected.push(c.a);
-                    else
-                        return 0 + "px";
-                    //return c.opacity * 2 + "px";
-                    return chart.strokeScale(c.score) + "px";
-                });
-                chart.web.selectAll("circle").transition().duration(500)
-                .attr("opacity", function (circle) {
-                    if (connected.indexOf(circle.name) > -1)
-                        return 1;
-                    else
-                        return 0.05;
-                });
-                return chart.show_details(d, i, this);
-            }).on("mouseout", function (d, i) {
-                chart.web.selectAll(".connection").transition().duration(500)
-                    .attr("stroke-width", function (c) {
-                        return chart.strokeScale(c.score) + "px";
-                    });
-                chart.web.selectAll("circle").transition().duration(500)
-                .attr("opacity", function (circle) {
-                    return 1;                    
-                });
-                return chart.hide_details(d, i, this);
-            }).on("click", function (d, i) {
-                if (!chart.inTransition && !chart.zoomed) {
-                    chart.inTransition = true;
-                    chart.hide_details(d, i, this);
-                    return chart.zoom_circle(d);
-                }
-            });
+                 var connected = [d.name];
+                 chart.web.selectAll(".connection").transition().duration(500)
+                 .attr("stroke-width", function (c) {
+                     if (c.a == d.name)
+                         connected.push(c.b);
+                     else if (c.b == d.name)
+                         connected.push(c.a);
+                     else
+                         return 0 + "px";
+                     //return c.opacity * 2 + "px";
+                     return chart.strokeScale(c.score) + "px";
+                 });
+                 chart.web.selectAll("circle").transition().duration(500)
+                 .attr("opacity", function (circle) {
+                     if (connected.indexOf(circle.name) > -1)
+                         return 1;
+                     else
+                         return 0.05;
+                 });
+                 return chart.show_details(d, i, this);
+             }).on("mouseout", function (d, i) {
+                 chart.web.selectAll(".connection").transition().duration(500)
+                     .attr("stroke-width", function (c) {
+                         return chart.strokeScale(c.score) + "px";
+                     });
+                 chart.web.selectAll("circle").transition().duration(500)
+                 .attr("opacity", function (circle) {
+                     return 1;
+                 });
+                 return chart.hide_details(d, i, this);
+             }).on("click", function (d, i) {
+                 if (!chart.inTransition && !chart.zoomed) {
+                     chart.inTransition = true;
+                     chart.hide_details(d, i, this);
+                     return chart.zoom_circle(d);
+                 }
+             });
 
         chart.circles.transition().duration(500)
             .attr("r", function (d) {
-                return d.radius; })
+                return d.radius;
+            })
             .each("end", function () {
                 chart.circles.transition().duration(500)
                     .attr("cx", function (d) {
                         d.x = d.friendScale.scale(d.friendshipScore).x;
-                        return d.friendScale.scale(d.friendshipScore).x; })
+                        return d.friendScale.scale(d.friendshipScore).x;
+                    })
                     .attr("cy", function (d) {
                         d.y = d.friendScale.scale(d.friendshipScore).y
-                        return d.friendScale.scale(d.friendshipScore).y; })
+                        return d.friendScale.scale(d.friendshipScore).y;
+                    })
                     .attr("fill", function (d) {
                         if (chart.zoomed)
                             return d3.rgb(chart.colors[d.group]).darker().darker().darker();
                         else
                             //return chart.clusterColors[d.cluster];
-                        return chart.colors[d.group]; 
+                            return chart.colors[d.group];
                     })
                     .attr("stroke", function (d) {
                         return d3.rgb(chart.colors[d.group]).darker();
                     })
                 .each("end", function () {
-                    chart.draw_connections();
+                    // chart.draw_connections();
                 });
-            });     
+            });
 
 
 
@@ -753,7 +738,7 @@ WebChart = (function () {
 
 
     };
-    
+
     /********************************************************************************
     *   FUNCTION: draw_connections                                                  *
     *   Draw the connections between the nodes.                                     *   
@@ -766,7 +751,7 @@ WebChart = (function () {
         var eucDist = function (a, b) {
             return Math.sqrt(Math.pow(b.x - a.x, 2) + Math.pow(b.y - a.y, 2));
         }
-        
+
 
         this.web.selectAll(".connection").data(chart.getConnections(chart.displayedNodes)).enter()
         .append("path")
@@ -782,10 +767,11 @@ WebChart = (function () {
             var point = chart.locationDictionary[d.a];
             var nextPoint = chart.locationDictionary[d.b];
             var nextPoint1Control = { x: 0, y: 0 }, nextPoint2Control = { x: 0, y: 0 };
-            var parallel = { x: nextPoint.y - point.y, y: nextPoint.x - point.x };
-            var dist = eucDist(nextPoint, point);
-            parallel.x /= dist;
-            parallel.y /= dist;
+            var parallel = WebChart.getParallel(point, nextPoint);
+            //var parallel = { x: nextPoint.y - point.y, y: nextPoint.x - point.x };
+            //var dist = eucDist(nextPoint, point);
+            //parallel.x /= dist;
+            //parallel.y /= dist;
             var midPoint = { x: point.x + (nextPoint.x - point.x) / 2 - parallel.x, y: point.y + (nextPoint.y - point.y) / 2 + parallel.y },
                 midPoint2 = { x: point.x + (nextPoint.x - point.x) / 2 + parallel.x, y: point.y + (nextPoint.y - point.y) / 2 - parallel.y };
             var modifier = 1;
@@ -805,9 +791,10 @@ WebChart = (function () {
             return " M " + point.x + "," + point.y + " C " + nextPoint1Control.x + "," + nextPoint1Control.y + " "
                         + nextPoint2Control.x + "," + nextPoint2Control.y + " " + nextPoint.x + "," + nextPoint.y;
         })
-        .transition().duration(500).attr("opacity", function (d) { 
-            
-            return chart.colorScale(d.score);; });
+        .transition().duration(500).attr("opacity", function (d) {
+
+            return chart.colorScale(d.score);;
+        });
         //Put circles on top
         this.vis.select("#userAvatarMain").each(function () {
             this.parentNode.appendChild(this);
@@ -965,7 +952,7 @@ WebChart = (function () {
         var color = chart.colors[toLabel[type]];
         var colors = d3.scale.ordinal()
             .range([d3.rgb(color).darker().darker().darker(), d3.rgb(color).darker().darker(),
-                d3.rgb(color).darker(),color, d3.rgb(color).brighter(0.8)]);
+                d3.rgb(color).darker(), color, d3.rgb(color).brighter(0.8)]);
 
         var xAxis = d3.svg.axis()
             .scale(x0)
@@ -989,8 +976,8 @@ WebChart = (function () {
         .attr("class", "Label name")
           .append("text")
             .attr("y", -6)
-            .attr("x",230)
-            .text("Comunication by time of day").attr("font-weight","bold");
+            .attr("x", 230)
+            .text("Comunication by time of day").attr("font-weight", "bold");
 
         g.append("g")
         .attr("class", "y axis")
@@ -1007,7 +994,7 @@ WebChart = (function () {
             .attr("width", x1.rangeBand())
             .attr("x", function (d) { return x1(d.time); })
             .attr("y", height)
-            .attr("height","0")
+            .attr("height", "0")
             .style("fill", function (d) { return colors(d.time); }).transition().duration(750)
       .delay(0)
       .attr("height", function (d) { return height - y(d.count); })
@@ -1019,7 +1006,7 @@ WebChart = (function () {
             .data(hourNames.slice())
           .enter().append("g")
             .attr("class", "legend")
-            .attr("transform", function (d, i) { return "translate(" + (-450+i * 100) + ",230)"; });//**
+            .attr("transform", function (d, i) { return "translate(" + (-450 + i * 100) + ",230)"; });//**
 
         legend.append("rect")
             .attr("x", width - 18)
@@ -1046,7 +1033,7 @@ WebChart = (function () {
                 d3.select(this).select("rect").style("stroke-width", "0px").style("fill",
                     function (d) { if (d == type) return "#eeeeee"; else return "#ffffff" });
             })
-            .on("click", function (x) { 
+            .on("click", function (x) {
                 if (x != type) {
                     chart.undraw_barschart();
                     chart.bartype = x;
@@ -1056,8 +1043,8 @@ WebChart = (function () {
             });
 
         buttons.append("rect")
-            .attr("x",601 )
-            .attr("y", function (d, i) { return 36+ i * 37; })
+            .attr("x", 601)
+            .attr("y", function (d, i) { return 36 + i * 37; })
             .attr("width", 31)
             .attr("height", 31)
             .style("fill", function (d) { if (d == type) return "#eeeeee"; else return "#ffffff"; });
@@ -1322,7 +1309,7 @@ WebChart = (function () {
                                content += ":0" + rest + " time in call";
                            else
                                content += ":" + rest + " time in call";
-                           return content;                           
+                           return content;
                        });
 
         chart.details.append("text")
@@ -1333,11 +1320,11 @@ WebChart = (function () {
             .style("font-size", "15px")
             .style("font-variant", "small-caps")
             .text(function () {
-                return chart.clicked.smsStat + " messages";   
+                return chart.clicked.smsStat + " messages";
             });
 
         chart.details.append("text")
-         .attr("x", function (d) { return (400 + (chart.clicked.name.length * 18) / 2) +100; })
+         .attr("x", function (d) { return (400 + (chart.clicked.name.length * 18) / 2) + 100; })
          .attr("id", "numberOfConnectionsBt")
          .attr("y", 80)
          .style("font-family", "Segoe UI")
@@ -1444,7 +1431,7 @@ WebChart = (function () {
         chart.details.selectAll(".symbol").data(pie(newpie))
             .transition()
             .duration(500)
-           .attr("transform", function (d,i) {
+           .attr("transform", function (d, i) {
                return "translate(" + Math.cos(((d.startAngle + d.endAngle - Math.PI) / 2)) * (chart.zoomed_radius + 30) +
                    "," + Math.sin((d.startAngle + d.endAngle - Math.PI) / 2) * (chart.zoomed_radius + 30) + ")";
            });
@@ -1558,12 +1545,10 @@ WebChart = (function () {
         stack.push(cluster);
         while (stack.length != 0) {
             var curr = stack.pop();
-            if(curr.left == undefined && curr.right == undefined)
-            {
+            if (curr.left == undefined && curr.right == undefined) {
                 curr.canonical.cluster = number;
             }
-            else
-            {
+            else {
                 stack.push(curr.left);
                 stack.push(curr.right);
             }
@@ -1572,7 +1557,7 @@ WebChart = (function () {
 
     WebChart.prototype.placeGreedy = function () {
         var positions = [];
-        var chart= this; 
+        var chart = this;
         var minPlacement = { index: 0, force: 0 };
         if (chart.displayedNodes.length == 0)
             return chart.displayedNodes;
@@ -1582,7 +1567,7 @@ WebChart = (function () {
             var alreadyPlaced = [];
             positions.push([]);
             positions[i].push(chart.displayedNodes[i]);
-            alreadyPlaced.push(chart.displayedNodes[i].name);           
+            alreadyPlaced.push(chart.displayedNodes[i].name);
 
             while (alreadyPlaced.length != chart.displayedNodes.length) {
                 var last = positions[i][positions[i].length - 1];
@@ -1606,9 +1591,9 @@ WebChart = (function () {
                 minPlacement = { index: 0, force: chart.evalPlacement(positions[i]) };
             else {
                 var newForce = chart.evalPlacement(positions[i]);
-                if (newForce < minPlacement.force) 
-                    minPlacement = { index: i, force: newForce };                
-            }            
+                if (newForce < minPlacement.force)
+                    minPlacement = { index: i, force: newForce };
+            }
         }
 
         return positions[minPlacement.index];
@@ -1642,7 +1627,7 @@ WebChart = (function () {
                 }
                 if (!exists && nodes[i].nbScores[nb] > 0)
                     conns.push({ a: nodes[i].name, b: nb, score: nodes[i].nbScores[nb] });
-            }         
+            }
         }
         if (conns.length > 0) {
             var maxNbScore = 0, minNbScore = conns[0].score, avgNbScore = { score: 0, count: 0 };
@@ -1664,18 +1649,32 @@ WebChart = (function () {
             stdDev = Math.sqrt(stdDev);
 
             conns.sort(function (a, b) { return b.score - a.score });
-            
+
             var cut;
             //TUTAJ ZMIENIC ZAKOMENTOWAC I DAC ZERA
-            //for (cut = 0; cut < conns.length; cut++) 
-              //  if (conns[cut].score < avg) break;
-            //conns = conns.splice(0, cut);
+            for (cut = 0; cut < conns.length; cut++)
+                if (conns[cut].score < avg) break;
+            conns = conns.splice(0, cut);
 
-            chart.colorScale.domain([0, maxNbScore]);
-            chart.strokeScale.domain([0, maxNbScore]);
+            chart.colorScale.domain([avg, maxNbScore]);
+            chart.strokeScale.domain([avg, maxNbScore]);
 
         }
         return conns;
+    };
+
+    WebChart.euclideanDistance = function (a, b) {
+        return Math.sqrt(Math.pow(b.x - a.x, 2) + Math.pow(b.y - a.y, 2));
+    };
+
+
+    WebChart.getParallel = function (a, b) {
+        var parallel = { x: b.y - a.y, y: -(b.x - a.x) };
+        var dist = WebChart.euclideanDistance(b, a);
+        parallel.x /= dist;
+        parallel.y /= dist;
+
+        return parallel;
     };
 
 
