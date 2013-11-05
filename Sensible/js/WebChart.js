@@ -95,12 +95,12 @@ WebChart = (function () {
         var date = new Date(Date.now());
         var obj = this;
         //TODO: HARDCODED BLAST TO THE PAST
-        var starting = new Date(1349958465000);//date.setMonth(date.getMonth() - 7)
+        var starting = /*new Date(1349958465000);*/date.setMonth(date.getMonth() - 7);
 
 
 
         setTimeout(function () {
-            obj.load_data(starting, new Date(1369239142000));//Date.now());
+            obj.load_data(starting, /*new Date(1369239142000));*/Date.now());
         }, 1000);
     };
 
@@ -167,8 +167,12 @@ WebChart = (function () {
             var name;
 
             //TODO: Fake translate between sensible_user_id and phone numbers, must be replaced with real stuff
+            //fake.forEach(function (l) {
+            //    if (l.number == extractNumber(d.call.number))
+            //        name = l.real_name;
+            //});
             fake.forEach(function (l) {
-                if (l.number == extractNumber(d.call.number))
+                if (d.call.number == l.sensible_user_id)
                     name = l.real_name;
             });
             if (name) {
@@ -191,8 +195,12 @@ WebChart = (function () {
             var d = chart.smsData[i];
             var name;
             //TODO: Fake translate between sensible_user_id and phone numbers, must be replaced with real stuff
+            //fake.forEach(function (l) {
+            //    if (l.number == extractNumber(d.message.address))
+            //        name = l.real_name;
+            //});
             fake.forEach(function (l) {
-                if (l.number == extractNumber(d.message.address))
+                if (d.message.address == l.sensible_user_id)
                     name = l.real_name;
             });
             if (name) {
@@ -290,24 +298,31 @@ WebChart = (function () {
             d.friendshipScore = 0;
             d.binsData = null;
             d.totalsData = null;
+            var lastDate = new Date(1,1,1);
             for (var j = 0; j < d.callData.length; j++) {
                 if (d.callData[j].timestamp > chart.endTime) break;
                 if (d.callData[j].timestamp > chart.startTime) {
-                    d.callScore += d.callData[j].score;
+                    var curDate = new Date(d.callData[j].timestamp);
+                    if (curDate.toDateString() != lastDate.toDateString)
+                        d.callScore += 1;//d.callData[j].score;
                     d.callStat += d.callData[j].stat;
                 }
             }
             for (var j = 0; j < d.smsData.length; j++) {
                 if (d.smsData[j].timestamp > chart.endTime) break;
                 if (d.smsData[j].timestamp > chart.startTime) {
-                    d.smsScore += d.smsData[j].score;
+                    var curDate = new Date(d.smsData[j].timestamp);
+                    if (curDate.toDateString() != lastDate.toDateString)
+                        d.smsScore += 1;//d.smsData[j].score;
                     d.smsStat += d.smsData[j].stat;
                 }
             }
             for (var j = 0; j < d.btData.length; j++) {
                 if (d.btData[j].timestamp > chart.endTime) break;
                 if (d.btData[j].timestamp > chart.startTime) {
-                    d.btScore += d.btData[j].score;
+                    var curDate = new Date(d.btData[j].timestamp);
+                    if (curDate.toDateString() != lastDate.toDateString)
+                        d.btScore += 1;//d.btData[j].score;
                     d.btStat += d.btData[j].stat;
                 }
             }
@@ -323,18 +338,18 @@ WebChart = (function () {
             chart.maxScores.bt = d.btScore > chart.maxScores.bt ? d.btScore : chart.maxScores.bt;
             chart.maxScores.call = d.callScore > chart.maxScores.call ? d.callScore : chart.maxScores.call;
             chart.maxScores.sms = d.smsScore > chart.maxScores.sms ? d.smsScore : chart.maxScores.sms;
-            chart.minScores.bt = (d.value < chart.minScores.bt || i == 0) ? d.value : chart.minScores.bt;
-            chart.minScores.call = (d.value < chart.minScores.call || i == 0) ? d.value : chart.minScores.call;
-            chart.minScores.sms = (d.value < chart.minScores.sms || i == 0) ? d.value : chart.minScores.sms;
+            chart.minScores.bt = (d.btScore < chart.minScores.bt || i == 0) ? d.btScore : chart.minScores.bt;
+            chart.minScores.call = (d.callScore < chart.minScores.call || i == 0) ? d.callScore : chart.minScores.call;
+            chart.minScores.sms = (d.smsScore < chart.minScores.sms || i == 0) ? d.smsScore : chart.minScores.sms;
         }
 
         //Update scales
         chart.friendScales.forEach(function (d) {
             d.scale = d3.scale.linear().domain([chart.minScores.total, chart.maxScores.total]).range([d.pointa, d.pointb]);
             d.scales = {
-                bt: d3.scale.linear().domain([chart.minScores.bt, chart.maxScores.bt]).range([d.pointa, d.pointb]),
-                sms: d3.scale.linear().domain([chart.minScores.sms, chart.maxScores.sms]).range([d.pointa, d.pointb]),
-                call: d3.scale.linear().domain([chart.minScores.call, chart.maxScores.call]).range([d.pointa, d.pointb])
+                bt: d3.scale.linear()/*.domain([chart.minScores.bt, chart.maxScores.bt])*/.range([d.pointa, d.pointb]),
+                sms: d3.scale.linear()/*.domain([chart.minScores.sms, chart.maxScores.sms])*/.range([d.pointa, d.pointb]),
+                call: d3.scale.linear()/*.domain([chart.minScores.call, chart.maxScores.call])*/.range([d.pointa, d.pointb])
             };
         });
 
@@ -363,12 +378,25 @@ WebChart = (function () {
 
         chart.displayedNodes = chart.placeGreedy();
 
+        
+
         chart.displayedNodes.forEach(function (d, i) {
             d.friendScale = chart.friendScales[i];
+            var radScale = d3.scale.linear().range([15, 25]).clamp(true);
+            //var maxScore = Math.max(d.btScore, d.callScore, d.smsScore);
             chart.locationDictionary[d.name] = { x: d.friendScale.scale(d.value).x, y: d.friendScale.scale(d.value).y };
-            d.subnodes.push({ label: "bt", radius: d.radius, score: d.btScore, scale: d.friendScale.scales.bt });
-            d.subnodes.push({ label: "call", radius: d.radius, score: d.callScore, scale: d.friendScale.scales.call });
-            d.subnodes.push({ label: "sms", radius: d.radius, score: d.smsScore, scale: d.friendScale.scales.sms });
+            d.subnodes.push({
+                label: "bt", radius: radScale.domain([chart.minScores.bt, chart.maxScores.bt])(d.btScore),
+                score: d.btScore, scale: d.friendScale.scales.bt.domain([0, d.value])
+            });
+            d.subnodes.push({
+                label: "call", radius: radScale.domain([chart.minScores.call, chart.maxScores.call])(d.callScore),
+                score: d.callScore, scale: d.friendScale.scales.call.domain([0, d.value])
+            });
+            d.subnodes.push({
+                label: "sms", radius: radScale.domain([chart.minScores.sms, chart.maxScores.sms])(d.smsScore),
+                score: d.smsScore, scale: d.friendScale.scales.sms.domain([0, d.value])
+            });
         });
 
 
@@ -408,9 +436,6 @@ WebChart = (function () {
 
         this.web = this.vis.append("g").attr("id", "Web");
         this.details = this.vis.append("g").attr("id", "Details");
-
-
-
         this.web.attr("transform", "translate(" + chart.center.x + ", " + chart.center.y + ")").on("click", function (d, i) {
             if (!chart.inTransition)
                 if (chart.zoomed) {
@@ -422,52 +447,6 @@ WebChart = (function () {
         this.web.append("rect").attr("x", -400).attr("y", -400).attr("height", 800).attr("width", 800).style("fill", "#ffffff");
 
 
-        //Draw the help button
-        var button,
-            button_text,
-            help = false;
-        var group = this.details.append("g")
-        .attr("id", "button-help")
-		.on("click", function () {
-		    if (help == false && !chart.zoomed) {
-		        chart.zoomed = true;
-		        Help.draw_help();
-
-		        help = true;
-		        button_text.text("x");
-		    }
-		    else if (help == true) {
-		        chart.zoomed = false;
-		        Help.undraw_help();
-		        help = false;
-		        button_text.text("?");
-		    }
-		})
-		.on("mouseover", function () {
-		    button.attr("fill", "#B1B1B1");
-		})
-		.on("mouseout", function () {
-		    button.attr("fill", "#dddddd");
-		});
-
-        button = group.append("rect")
-            .attr("x", chart.width - 30)
-            .attr("y", 10)
-            .attr("width", 30)
-            .attr("height", 30)
-            .attr("fill", "#dddddd")
-            .attr("stroke", "#aaaaaa")
-            .attr("stroke-width", 0.25);
-
-        button_text = group.append("text")
-		.attr("x", chart.width - 20)
-		.attr("y", 30)
-		.style("cursor", "hand")
-		.style("font-family", "Segoe UI")
-		.style("font-size", "20px")
-		.style("font-variant", "small-caps")
-		.style("font-weight", "bold")
-		.text("?");
 
         //Draw the web radial lines
         for (segment = 0; segment < chart.segments; segment++) {
@@ -504,9 +483,10 @@ WebChart = (function () {
 
 
 
-        this.circles.selectAll("circle").data(function (d) {
-            return d.subnodes;
-        })
+        this.circles.selectAll("circle")
+            .data(function (d) {
+                return d.subnodes;
+            })
             .enter()
             .append("circle")
             .attr("r", 0)
@@ -516,68 +496,60 @@ WebChart = (function () {
                 //return chart.clusterColors[d.cluster];
                 return chart.colors[d.label];
             })
-            .attr("stroke-width", 2).attr("stroke", function (d) {
+            .attr("stroke-width", 2)
+            .attr("stroke", function (d) {
                 return d3.rgb(chart.colors[d.label]).darker();
-            }).attr("id", function (d) {
+            })
+            .attr("id", function (d) {
                 return "bubble_" + d.label;
             });
 
-
-
-
         this.web.selectAll(".person")
-        .each(function (grp) {
-            var circles = d3.select(this).selectAll("circle").data();
-            var radScale = d3.scale.linear().domain([0, grp.value]).range([5, 20]).clamp(true);
-
-
-            for (var i = 0; i < circles.length; ++i) {
-                circles[i]["x"] = circles[i].scale(circles[i].score).x;
-                circles[i]["y"] = circles[i].scale(circles[i].score).y;
-            }
-
-            var parallel = WebChart.getParallel(grp.friendScale.pointa, grp.friendScale.pointb);
-           
-            circles[0].radius = radScale(grp.btScore);
-            circles[1].radius = radScale(grp.callScore);
-            circles[2].radius = radScale(grp.smsScore);
-
-
-            var circleDistance = WebChart.euclideanDistance(circles[0], circles[1]), idealDistance = circles[0].radius + circles[1].radius;
-
-            if (circleDistance < idealDistance) {
-                circles[1].x += parallel.x * Math.sqrt(Math.pow(idealDistance, 2) - Math.pow(circleDistance, 2))
-                circles[1].y += parallel.y * Math.sqrt(Math.pow(idealDistance, 2) - Math.pow(circleDistance, 2))
-
-            }
-            circleDistance = WebChart.euclideanDistance(circles[0], circles[2])
-            circleDistance = WebChart.euclideanDistance(circles[0], circles[1]), idealDistance = circles[0].radius + circles[2].radius;
-            if (circleDistance < idealDistance) {
-                circles[2].x -= parallel.x * Math.sqrt(Math.pow(idealDistance, 2) - Math.pow(circleDistance, 2))
-                circles[2].y -= parallel.y * Math.sqrt(Math.pow(idealDistance, 2) - Math.pow(circleDistance, 2))
-
-            }
-            circleDistance = WebChart.euclideanDistance(circles[1], circles[2])
-            circleDistance = WebChart.euclideanDistance(circles[0], circles[1]), idealDistance = circles[1].radius + circles[2].radius;
-            if (circleDistance < idealDistance) {
-                circles[2].x -= parallel.x * Math.sqrt(Math.pow(idealDistance, 2) - Math.pow(circleDistance, 2))
-                circles[2].y -= parallel.y * Math.sqrt(Math.pow(idealDistance, 2) - Math.pow(circleDistance, 2))
-
-            }
-       
-            d3.select(this).selectAll("circle").transition().duration(500).attr("r", function (d) {
-                return d.radius;
-            }).each("end", function () {
+            .each(function (grp) {
+                var circles = d3.select(this).selectAll("circle").data();
                 
 
-                d3.select(this).transition().duration(500)
-                .attr("cx", function (d) {
-                    return d.x;
-                })
-                .attr("cy", function (d) { return d.y; })
-            });
 
-        });
+                for (var i = 0; i < circles.length; ++i) {
+                    circles[i]["x"] = circles[i].scale(circles[i].score).x;
+                    circles[i]["y"] = circles[i].scale(circles[i].score).y;
+                }
+
+                var parallel = WebChart.getParallel(grp.friendScale.pointa, grp.friendScale.pointb);
+
+
+                var circleDistance = WebChart.euclideanDistance(circles[0], circles[1]), idealDistance = circles[0].radius + circles[1].radius;
+
+                if (circleDistance < idealDistance) {
+                    circles[1].x += parallel.x * Math.sqrt(Math.pow(idealDistance, 2) - Math.pow(circleDistance, 2))
+                    circles[1].y += parallel.y * Math.sqrt(Math.pow(idealDistance, 2) - Math.pow(circleDistance, 2))
+
+                }
+
+                circleDistance = WebChart.euclideanDistance(circles[0], circles[2]), idealDistance = circles[0].radius + circles[2].radius;
+                if (circleDistance < idealDistance) {
+                    circles[2].x -= parallel.x * Math.sqrt(Math.pow(idealDistance, 2) - Math.pow(circleDistance, 2))
+                    circles[2].y -= parallel.y * Math.sqrt(Math.pow(idealDistance, 2) - Math.pow(circleDistance, 2))
+
+                }
+                circleDistance = WebChart.euclideanDistance(circles[1], circles[2]), idealDistance = circles[1].radius + circles[2].radius;
+                if (circleDistance < idealDistance) {
+                    circles[2].x -= parallel.x * Math.sqrt(Math.pow(idealDistance, 2) - Math.pow(circleDistance, 2))
+                    circles[2].y -= parallel.y * Math.sqrt(Math.pow(idealDistance, 2) - Math.pow(circleDistance, 2))
+
+                }
+
+                d3.select(this).selectAll("circle").transition().duration(500).attr("r", function (d) {
+                    return d.radius;
+                }).each("end", function () {
+                    d3.select(this).transition().duration(500)
+                    .attr("cx", function (d) {
+                        return d.x;
+                    })
+                    .attr("cy", function (d) { return d.y; })
+                });
+
+            });
 
     
     };
