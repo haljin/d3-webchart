@@ -1,9 +1,0 @@
-*.suo
-*.exe
-*.obj
-Sensible/data/bluetooth/
-Sensible/data/sms/
-Sensible/data/call_log/
-Sensible/data/location/
-Sensible/data/loc_contact/
-Sensible/data/collective/
