@@ -2,54 +2,102 @@
 <!--[if lt IE 7]> <html class="no-js ie6 oldie" lang="en"> <![endif]-->
 <!--[if IE 7]>    <html class="no-js ie7 oldie" lang="en"> <![endif]-->
 <!--[if IE 8]>    <html class="no-js ie8 oldie" lang="en"> <![endif]-->
-<!--[if gt IE 8]><!--> <html class="no-js" lang="en"> <!--<![endif]-->
+<!--[if gt IE 8]><!-->
+<html class="no-js" lang="en">
+<!--<![endif]-->
 <head>
-  <meta charset="utf-8">
+    <meta charset="utf-8">
 
-  <title>DTU Sensible</title>
-  <meta name="description" content="">
-  <meta name="author" content="">
+    <title>DTU Sensible</title>
+    <meta name="description" content="">
+    <meta name="author" content="">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
 
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+    <!-- CSS concatenated and minified via ant build script-->
+    <link rel="stylesheet" href="css/reset.css">
+    <link rel="stylesheet" href="css/bootstrap.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <!-- end CSS-->
 
-  <!-- CSS concatenated and minified via ant build script-->
-  <link rel="stylesheet" href="css/reset.css">
-  <link rel="stylesheet" href="css/bootstrap.min.css">
-  <link rel="stylesheet" href="css/style.css">
-  <!-- end CSS-->
+    <script>window.jQuery || document.write('<script src="libs/jquery-1.6.2.min.js"><\/script>')</script>
+    <script src="d3/d3.v3.min.js"></script>
 
-  <script src="libs/modernizr-2.0.6.min.js"></script>
+    <script src="libs/fake.js"></script> 
+    <script>
+        root = typeof exports !== "undefined" && exports !== null ? exports : this;
+        var webchart, loadScreen, timeline;
+
+        $(function () { 
+            
+
+            loadScreen = new LoadingScreen(1200 / 2, 750 / 2);
+            loadScreen.show_loading_screen();
+
+
+            var token = "TESTDATA"
+            var baseUrl = "http://localhost:5777/Sensible/data"
+            //var token = "deca86ae4bac4d8caff4dec795f4d837";
+
+            var remaining = 3;
+            var runOnce = [false, false, false]; //In Chrome sometimes json would be loaded twice?
+            var btData, smsData, callData;
+
+            var beginVis = function () {
+                webchart = new WebChart(btData, smsData, callData);
+                timeline = new Timeline(DataProcessor.gen_collective_data(btData, smsData, callData), webchart);
+                
+                loadScreen.hide_loading_screen();
+            };
+
+            //Load Call probe data. Load parallel rather than sequential
+            d3.json(baseUrl + "/call_log/" + token, function (data) {
+                if (!runOnce[0]) {
+                    runOnce[0] = true;
+                    callData = data;
+                    if (! --remaining)
+                        beginVis();
+                }
+            });
+            //Load SMS probe data
+            d3.json(baseUrl + "/sms/" + token, function (data) {
+                if (!runOnce[1]) {
+                    runOnce[1] = true;
+                    smsData = data;
+                    if (! --remaining)
+                        beginVis();
+                }
+            });
+            //Load Bluetooth probe data
+            d3.json(baseUrl + "/bluetooth/" + token, function (data) {
+                if (!runOnce[2]) {
+                    runOnce[2] = true;
+                    btData = data;
+                    if (! --remaining)
+                        beginVis();
+                }
+            });
+
+        });
+
+
+    </script>
+    <script src="libs/fake.js"></script>
+
+    <script src="js/DataProcessor.js"></script>
+    <script src="js/Timeline.js"></script>
+    <script src="js/CustomTooltip.js"></script>
+    <script src="js/LoadingScreen.js"></script>
+    <script src="js/WebChart.js"></script>
+    
 </head>
 
 <body>
-
-    <div id="trolol" style="width:1340px;height:900px;">
-      <div id="vis-timeline" style="width:400px;height:800px;float:left;"></div>
-      <div id="vis" style="width:940px;height:800px;float:right;"></div>
-      
-    </div>
-
-
-  <!-- <script src="//ajax.googleapis.com/ajax/libs/jquery/1.6.2/jquery.min.js"></script> -->
-  <script>window.jQuery || document.write('<script src="libs/jquery-1.6.2.min.js"><\/script>')</script>
-
-  <script defer src="js/plugins.js"></script>
-  <script defer src="js/script.js"></script>
-  <script src="d3/d3.v3.min.js"></script>
-  <script src="libs/jsonp.js"></script>
-  <script>
-      var chart;
-  </script>
-      <script src="js/Help.js"></script>
-  <script src="libs/fake.js"></script>
-  <script src="js/CustomTooltip.js"></script>
-  
-  <script src="libs/vis.js"></script>
-  <script src="libs/calendar.js"></script>
-  <!--[if lt IE 7 ]>
+    <div id="vis" style="width: 1200px; height: 750px;"></div>
+    <div id="timeline" style="width: 1200px; height: 150px;"></div>
+    <!--[if lt IE 7 ]>
     <script src="//ajax.googleapis.com/ajax/libs/chrome-frame/1.0.3/CFInstall.min.js"></script>
     <script>window.attachEvent('onload',function(){CFInstall.check({mode:'overlay'})})</script>
   <![endif]-->
-  
+
 </body>
 </html>

@@ -1,15 +1,17 @@
 ﻿var Timeline;
 
 Timeline = (function () {
-    function Timeline(token) {
+    function Timeline(timelineData, webchartRef) {
         this.width = 1200;
         this.height = 150;
-        this.token = token;
-        this.data = null;
+        this.data = timelineData;
         this.svg = null;
         this.colors = { call: "#b1f413", sms: "#ffd314", bt: "#7f1ac3" };
         this.baseUrl = "http://localhost:5777/Sensible/data";
-        this.load_data();
+        this.webchartRef = webchartRef;
+
+        this.draw_calendar();
+        
 
     };
 
@@ -25,8 +27,8 @@ Timeline = (function () {
         var date = new Date(Date.now()), ending = new Date(Date.now());
         ending.setHours(0);
         ending.setMinutes(0);
-       // var starting = new Date(date.setMonth(date.getMonth() - 7));
-        var starting = new Date(1349958465000), ending = new Date(1369239142000);
+        var starting = d3.min(data[0], function (d) { return d.date; });//new Date(date.setMonth(date.getMonth() - 7));
+       // var starting = new Date(1349958465000), ending = new Date(1369239142000);
 
         var n = 3, // number of layers
            m = data[2].length; // number of samples per layer
@@ -108,26 +110,11 @@ Timeline = (function () {
         }
 
         function brushend() {
-            webchart.startTime = brush.extent()[0].valueOf() / 1000;
-            webchart.endTime = brush.extent()[1].valueOf() / 1000;
-            webchart.update_vis();
+            chart.webchartRef.startTime = brush.extent()[0].valueOf() / 1000;
+            chart.webchartRef.endTime = brush.extent()[1].valueOf() / 1000;
+            chart.webchartRef.update_nodes();
         }
 
-    };
-
-
-    Timeline.prototype.load_data = function () {
-        var chart = this;
-        var runOnce = false;
-
-        //Load Call probe data
-        d3.json(chart.baseUrl + "/collective/" + chart.token, function (data) {
-            if (!runOnce) {
-                runOnce = true;
-                chart.data = data;
-                chart.draw_calendar();
-            }
-        });
     };
 
 

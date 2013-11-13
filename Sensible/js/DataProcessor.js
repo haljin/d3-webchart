@@ -117,19 +117,19 @@ DataProcessor = (function () {
 
         var result = [[], [], []];
         var maxc = 0, maxb = 0, maxs = 0;
-        for (var i = 0; i < data.data.length; i++) {
-            maxc = data.data[i].callcount > maxc ? data.data[i].callcount : maxc;
-            maxs = data.data[i].smscount > maxs ? data.data[i].smscount : maxs;
-            maxb = data.data[i].btcount > maxb ? data.data[i].btcount : maxb;
+        for (var i = 0; i < data.length; i++) {
+            maxc = data[i].callcount > maxc ? data[i].callcount : maxc;
+            maxs = data[i].smscount > maxs ? data[i].smscount : maxs;
+            maxb = data[i].btcount > maxb ? data[i].btcount : maxb;
         }
         maxc = maxs = maxb = 1;
 
-        for (var i = 0; i < data.data.length; i++) {
-            var theDate = new Date(data.data[i].date);
+        for (var i = 0; i < data.length; i++) {
+            var theDate = new Date(data[i].date);
             theDate.setHours(0, 0, 0, 0);
-            result[0].push({ date: theDate, x: i, y: data.data[i].callcount / maxc, y0: 0 });
-            result[1].push({ date: theDate, x: i, y: data.data[i].smscount / maxs, y0: data.data[i].callcount / maxc });
-            result[2].push({ date: theDate, x: i, y: data.data[i].btcount / maxb, y0: data.data[i].callcount / maxc + data.data[i].smscount / maxs });
+            result[0].push({ date: theDate, x: i, y: data[i].callcount / maxc, y0: 0 });
+            result[1].push({ date: theDate, x: i, y: data[i].smscount / maxs, y0: data[i].callcount / maxc });
+            result[2].push({ date: theDate, x: i, y: data[i].btcount / maxb, y0: data[i].callcount / maxc + data[i].smscount / maxs });
         }
 
         return result;
@@ -333,6 +333,8 @@ DataProcessor = (function () {
         result.sort(function (a, b) {
             return a.date - b.date;
         });
+
+        return result;
     };
 
 
