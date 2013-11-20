@@ -6,7 +6,7 @@ WebChart = (function () {
         //Main layout fields
         this.vis = null;
         this.width = 1200;
-        this.height = 750;
+        this.height = 550;
         this.center = {
             x: this.width / 2,
             y: this.height / 2
@@ -23,7 +23,7 @@ WebChart = (function () {
         this.web = { bt: null, call: null, sms: null };
         this.segments = 16;
         this.levels = 3;
-        this.points = this.getPoints((this.width - 650) / 3.5, this.segments, this.levels);
+        this.points = this.getPoints((this.width - 700) / 3.5, this.segments, this.levels);
         this.radius_scale;
         this.friendScales = [];
         this.unusedScales = [];
@@ -189,7 +189,7 @@ WebChart = (function () {
 
 
         for (var i = 0 ; i < chart.segments ; i++) {
-            var pa = chart.points.byLevel[chart.levels - 1][i], pb = chart.points.byLevel[0][i];
+            var pa = chart.points.byLevel[chart.levels-1][i], pb = chart.points.byLevel[0][i];
             chart.friendScales.push({
                 bt: d3.scale.linear().range([pa, pb]),
                 call: d3.scale.linear().range([pa, pb]),
@@ -312,7 +312,7 @@ WebChart = (function () {
         else
             this.vis = d3.select("#svg_vis").append("g").attr("id", "WebChart");
 
-        var channels = { bt: {x:0, y: -100}, sms: {x:-300, y:200}, call: {x:300, y:200}};
+        var channels = { bt: {x:0, y: 0}, sms: {x:-400, y:0}, call: {x:400, y:0}};
         //Draw web for each channel
         for (channel in channels)
         {
@@ -324,14 +324,19 @@ WebChart = (function () {
             for (segment = 0; segment < chart.segments; segment++) {
                 //console.debug(chart.points.bySegment[segment]);
                 var start = chart.points.bySegment[segment][0];
-                var end = chart.points.bySegment[segment][chart.levels];
-                this.web[channel].append("path")
-                    .attr("d", "M" + start.x + " " + start.y + " L " + end.x + " " + end.y)
+                var end = chart.points.bySegment[segment][chart.levels-1];
+                this.web[channel].append("line")
+                    .attr("x1", start.x)
+                    .attr("y1", start.y)
+                    .attr("x2", end.x)
+                    .attr("y2", end.y)
                     .style("stroke-dasharray", "15 5")
                     .style("stroke", "#000")
                 .attr("opacity", 0.5);
             }              
-        }    
+        }
+
+        
     };
 
     /********************************************************************************
@@ -353,7 +358,7 @@ WebChart = (function () {
 
             this.circles[channel].enter()
                    .append("circle")
-                   .attr("class", "person")
+                   .attr("class", channel)
                    .attr("r", 0)
                    .attr("cx", function (d) {
                        return d.friendScales[channel](chart.minScores[channel]).x;
@@ -373,16 +378,33 @@ WebChart = (function () {
                        return "bubble_" + d.id;
                    })
                    .on("mouseover", function (d, i) {
+                       var id = this.getAttribute("id");
+                       chart.vis.selectAll("#" + id)
+                           .attr("fill", function(d) {
+                               return  d3.rgb(chart.colors[this.getAttribute("class")]).brighter();
+                           })
+                           .attr("stroke", function (d) {
+                               return chart.colors[this.getAttribute("class")];
+                           });
                        return chart.show_details(d, i, this);
                    })
                    .on("mouseout", function (d, i) {
+                       var id = this.getAttribute("id");
+                       chart.vis.selectAll("#" + id)
+                           .attr("fill", function (d) {
+                               return  chart.colors[this.getAttribute("class")];
+                           })
+                           .attr("stroke", function(d) {
+                               return d3.rgb(chart.colors[this.getAttribute("class")]).darker();
+                           });
+
                        return chart.hide_details(d, i, this);
                    });
         }
 
 
 
-        this.web.bt.selectAll("circle").transition().duration(500).attr("r", function (d) {
+        this.circles.bt.transition().duration(500).attr("r", function (d) {
             return d.radius;
         }).each("end", function () {
             d3.select(this).transition().duration(500)
@@ -394,7 +416,7 @@ WebChart = (function () {
             })
         });
 
-        this.web.call.selectAll("circle").transition().duration(500).attr("r", function (d) {
+        this.circles.call.transition().duration(500).attr("r", function (d) {
             return d.radius;
         }).each("end", function () {
             d3.select(this).transition().duration(500)
@@ -405,7 +427,7 @@ WebChart = (function () {
                 return d.friendScales.call(d.callScore).y;
             })
         });
-        this.web.sms.selectAll("circle").transition().duration(500).attr("r", function (d) {
+        this.circles.sms.transition().duration(500).attr("r", function (d) {
             return d.radius;
         }).each("end", function () {
             d3.select(this).transition().duration(500)
@@ -505,7 +527,7 @@ WebChart = (function () {
             rest = data.callStat % 3600;
             var minutes = Math.floor(rest / 60);
             rest = rest % 60;
-            d3.select(element).attr("stroke", "black");
+            //d3.select(element).attr("stroke", "black");
             content = "<span class=\"name\">ID:</span><span class=\"value\"> " + data.name + "</span><br/>";
             //content += "<span class=\"name\">Calls: </span><span class=\"value\">" + hours
             //if (minutes < 10)
@@ -524,12 +546,6 @@ WebChart = (function () {
     };
 
     WebChart.prototype.hide_details = function (data, i, element) {
-        var chart = this;
-        if (!this.zoomed) {
-            d3.select(element).attr("stroke", function (d) {
-                return d3.rgb(chart.colors[d.group]).darker();
-            });
-        }
         return this.tooltip.hideTooltip();
     };
 

@@ -1,24 +1,44 @@
 ﻿
-Microsoft Visual Studio Solution File, Format Version 11.00
+Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2012
-Project("{E24C65DC-7377-472B-9ABA-BC803B73C61A}") = "Sensible", "..\..\..\GitHub\d3-webchart\Sensible\", "{125F323E-5FDC-4287-B030-5DE2BC1D2DAA}"
+Project("{E24C65DC-7377-472B-9ABA-BC803B73C61A}") = "Sensible", ".", "{125F323E-5FDC-4287-B030-5DE2BC1D2DAA}"
 	ProjectSection(WebsiteProperties) = preProject
 		TargetFrameworkMoniker = ".NETFramework,Version%3Dv4.0"
 		Debug.AspNetCompiler.VirtualPath = "/Sensible"
-		Debug.AspNetCompiler.PhysicalPath = "..\..\..\GitHub\d3-webchart\Sensible\"
+		Debug.AspNetCompiler.PhysicalPath = "..\Sensible\"
 		Debug.AspNetCompiler.TargetPath = "PrecompiledWeb\Sensible\"
 		Debug.AspNetCompiler.Updateable = "true"
 		Debug.AspNetCompiler.ForceOverwrite = "true"
 		Debug.AspNetCompiler.FixedNames = "false"
 		Debug.AspNetCompiler.Debug = "True"
 		Release.AspNetCompiler.VirtualPath = "/Sensible"
-		Release.AspNetCompiler.PhysicalPath = "..\..\..\GitHub\d3-webchart\Sensible\"
+		Release.AspNetCompiler.PhysicalPath = "..\Sensible\"
 		Release.AspNetCompiler.TargetPath = "PrecompiledWeb\Sensible\"
 		Release.AspNetCompiler.Updateable = "true"
 		Release.AspNetCompiler.ForceOverwrite = "true"
 		Release.AspNetCompiler.FixedNames = "false"
 		Release.AspNetCompiler.Debug = "False"
 		VWDPort = "5777"
+	EndProjectSection
+EndProject
+Project("{E24C65DC-7377-472B-9ABA-BC803B73C61A}") = "Sensible", "..\..\sensible-haljin\Sensible\", "{D312D9E6-48EA-4E65-A0C4-344F1D3A864B}"
+	ProjectSection(WebsiteProperties) = preProject
+		TargetFrameworkMoniker = ".NETFramework,Version%3Dv4.0"
+		Debug.AspNetCompiler.VirtualPath = "/Sensible"
+		Debug.AspNetCompiler.PhysicalPath = "..\..\sensible-haljin\Sensible\"
+		Debug.AspNetCompiler.TargetPath = "PrecompiledWeb\Sensible\"
+		Debug.AspNetCompiler.Updateable = "true"
+		Debug.AspNetCompiler.ForceOverwrite = "true"
+		Debug.AspNetCompiler.FixedNames = "false"
+		Debug.AspNetCompiler.Debug = "True"
+		Release.AspNetCompiler.VirtualPath = "/Sensible"
+		Release.AspNetCompiler.PhysicalPath = "..\..\sensible-haljin\Sensible\"
+		Release.AspNetCompiler.TargetPath = "PrecompiledWeb\Sensible\"
+		Release.AspNetCompiler.Updateable = "true"
+		Release.AspNetCompiler.ForceOverwrite = "true"
+		Release.AspNetCompiler.FixedNames = "false"
+		Release.AspNetCompiler.Debug = "False"
+		VWDPort = "10330"
 	EndProjectSection
 EndProject
 Global
@@ -28,6 +48,8 @@ Global
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{125F323E-5FDC-4287-B030-5DE2BC1D2DAA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{125F323E-5FDC-4287-B030-5DE2BC1D2DAA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D312D9E6-48EA-4E65-A0C4-344F1D3A864B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D312D9E6-48EA-4E65-A0C4-344F1D3A864B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

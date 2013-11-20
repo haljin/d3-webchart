@@ -122,7 +122,7 @@ DataProcessor = (function () {
             maxs = data[i].smscount > maxs ? data[i].smscount : maxs;
             maxb = data[i].btcount > maxb ? data[i].btcount : maxb;
         }
-        maxc = maxs = maxb = 1;
+        //maxc = maxs = maxb = 1;
 
         for (var i = 0; i < data.length; i++) {
             var theDate = new Date(data[i].date);
@@ -134,6 +134,7 @@ DataProcessor = (function () {
 
         return result;
     };
+
 
 
     DataProcessor.parse_loc_data = function (data, accuracy, realName, start, end) {
