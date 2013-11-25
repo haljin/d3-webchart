@@ -6,7 +6,7 @@ WebChart = (function () {
         //Main layout fields
         this.vis = null;
         this.width = 1200;
-        this.height = 550;
+        this.height = 450;
         this.center = {
             x: this.width / 2,
             y: this.height / 2
@@ -55,25 +55,29 @@ WebChart = (function () {
                 smsData: [],            //Array with all sms made to that person
                 btData: [],             //Array with all bt connections to that person
                 nbData: {},             //Dictionary with all bt connections that person made to others (data is array of timestamps)
+                colData: null,
                 callStat: 0,            //Total call statistic (sum of call duration)
                 smsStat: 0,             //Total sms statistic
                 btStat: 0,              //Total bt connection statistic
-                friendScales: null
+                friendScales: null,
+                clicked: false
             }
         }
 
         //Control fields	
         this.tooltip = CustomTooltip("gates_tooltip", 300);
         this.circles = { bt: null, call: null, sms: null };
+        this.realStartTime;
         this.startTime;
         this.endTime;
+        this.timelineRef;
 
         var date = new Date(Date.now());
         var obj = this;
         //TODO: HARDCODED BLAST TO THE PAST
-        var starting = /*new Date(1349958465000);*/date.setMonth(date.getMonth() - 7);
-
-
+        var starting = /*new Date(1349958465000);*/date.setMonth(date.getMonth() - 3);
+        date = new Date(Date.now());
+        this.realStartTime = date.setMonth(date.getMonth() - 5);
 
         setTimeout(function () {
             obj.create_nodes(starting, /*new Date(1369239142000));*/Date.now());
@@ -282,16 +286,27 @@ WebChart = (function () {
         }
         chart.displayedNodes = chart.nodes.slice(0, slice);
 
-        for (var i = 0; i < chart.displayedNodes.length; i++) {
-            chart.displayedNodes[i].nbScores = DataProcessor.parse_nb_data(chart.displayedNodes[i], chart.displayedNodes, chart.startTime, chart.endTime);
+        for (var i = slice; i< chart.nodes; i++){
+            if (chart.nodes[i].friendScales != null) {
+                chart.friendsScales.push(chart.nodes[i].friendScales);
+                chart.nodes[i].friendScales = null;
+            }
+            chart.nodes[i].clicked = false;
         }
 
-        chart.displayedNodes = chart.placeGreedy();
+        for (var i = 0; i < chart.displayedNodes.length; i++) {
+            chart.displayedNodes[i].nbScores = DataProcessor.parse_nb_data(chart.displayedNodes[i], chart.displayedNodes, chart.startTime, chart.endTime);
+            if( chart.displayedNodes[i].colData == null)
+                chart.displayedNodes[i].colData = DataProcessor.parse_totals_data(chart.displayedNodes[i].callData, chart.displayedNodes[i].smsData, chart.displayedNodes[i].btData);
+        }
+
+        //chart.displayedNodes = chart.placeGreedy();
 
         
 
         chart.displayedNodes.forEach(function (d, i) {
-            d.friendScales = chart.friendScales[i];
+            if(d.friendScales == null)
+                d.friendScales = chart.friendScales.pop();
             d.friendScales.bt.domain([chart.minScores.bt, chart.maxScores.bt]);
             d.friendScales.call.domain([chart.minScores.call, chart.maxScores.call]);
             d.friendScales.sms.domain([chart.minScores.sms, chart.maxScores.sms]);
@@ -334,7 +349,7 @@ WebChart = (function () {
                     .style("stroke", "#000")
                 .attr("opacity", 0.5);
             }              
-        }
+        }  
 
         
     };
@@ -368,38 +383,81 @@ WebChart = (function () {
                    })
                    .attr("fill", function (d) {
                        //return chart.clusterColors[d.cluster];
-                       return chart.colors[channel];
+                       if (!d.clicked)
+                           return chart.colors[channel];
+                       else
+                           return "#ff9896"
                    })
                    .attr("stroke-width", 2)
                    .attr("stroke", function (d) {
-                       return d3.rgb(chart.colors[channel]).darker();
+                       if (!d.clicked)
+                           return d3.rgb(chart.colors[channel]).darker();
+                       else
+                           return "#d62728";
                    })
                    .attr("id", function (d) {
                        return "bubble_" + d.id;
                    })
                    .on("mouseover", function (d, i) {
                        var id = this.getAttribute("id");
-                       chart.vis.selectAll("#" + id)
-                           .attr("fill", function(d) {
-                               return  d3.rgb(chart.colors[this.getAttribute("class")]).brighter();
-                           })
-                           .attr("stroke", function (d) {
-                               return chart.colors[this.getAttribute("class")];
-                           });
-                       return chart.show_details(d, i, this);
-                   })
-                   .on("mouseout", function (d, i) {
-                       var id = this.getAttribute("id");
-                       chart.vis.selectAll("#" + id)
-                           .attr("fill", function (d) {
-                               return  chart.colors[this.getAttribute("class")];
-                           })
-                           .attr("stroke", function(d) {
-                               return d3.rgb(chart.colors[this.getAttribute("class")]).darker();
-                           });
+                       if (!d.clicked) {
+                           chart.vis.selectAll("#" + id)
+                               .attr("fill", function (d) {
+                                   return d3.rgb(chart.colors[this.getAttribute("class")]).brighter().brighter();
+                               })
+                               .attr("stroke", function (d) {
+                                   return d3.rgb(chart.colors[this.getAttribute("class")]).brighter();
+                               });
+                       }
+                       else {
+                           chart.vis.selectAll("#" + id)
+                               .attr("fill", d3.rgb("#ff9896").brighter())
+                               .attr("stroke", d3.rgb("#d62728").brighter());
 
-                       return chart.hide_details(d, i, this);
-                   });
+                       }
+                        return chart.show_details(d, i, this);
+                    })
+                    .on("mouseout", function (d, i) {
+                        var id = this.getAttribute("id");
+                        if (!d.clicked) {
+                            chart.vis.selectAll("#" + id)
+                                .attr("fill", function (d) {
+                                    return chart.colors[this.getAttribute("class")];
+                                })
+                                .attr("stroke", function (d) {
+                                    return d3.rgb(chart.colors[this.getAttribute("class")]).darker();
+                                });
+                        }
+                        else {
+                            chart.vis.selectAll("#" + id)
+                                .attr("fill", d3.rgb("#ff9896"))
+                                .attr("stroke", d3.rgb("#d62728"));
+
+                        }
+                        return chart.hide_details(d, i, this);
+                    })
+                .on("click", function (d) {
+                    var id = this.getAttribute("id");
+                        
+                    if (!d.clicked) {
+                        chart.vis.selectAll("#" + id)
+                            .attr("fill", "#ff9896")
+                            .attr("stroke", "#d62728");
+
+                        chart.timelineRef.addPerson(d.colData.totals);
+                    }
+                    else {
+                        chart.vis.selectAll("#" + id)
+                                .attr("fill", function (d) {
+                                    return  chart.colors[this.getAttribute("class")];
+                                })
+                                .attr("stroke", function(d) {
+                                    return d3.rgb(chart.colors[this.getAttribute("class")]).darker();
+                                });
+                        chart.timelineRef.removePerson(d.colData.totals);
+                    }
+                    d.clicked = !d.clicked;
+                });
         }
 
 
@@ -439,18 +497,9 @@ WebChart = (function () {
             })
         });
         
-        //this.circles = this.web.bt.selectAll("circle").data(chart.displayedNodes, function (d) {
-        //    return d.id;
-        //});
-        //this.circles.exit().transition().duration(500).attr("r", 0).remove();
-        ////Reset pre-existing connections
-        //this.web.bt.selectAll(".connection").remove();
-
-
-     
-
-
     };
+
+
 
     /********************************************************************************
     *   FUNCTION: draw_connections                                                  *
@@ -520,32 +569,17 @@ WebChart = (function () {
 
 
     WebChart.prototype.show_details = function (data, i, element) {
-        if (!this.zoomed) {
-            var content;
-            var rest;
-            var hours = Math.floor(data.callStat / 3600);
-            rest = data.callStat % 3600;
-            var minutes = Math.floor(rest / 60);
-            rest = rest % 60;
-            //d3.select(element).attr("stroke", "black");
-            content = "<span class=\"name\">ID:</span><span class=\"value\"> " + data.name + "</span><br/>";
-            //content += "<span class=\"name\">Calls: </span><span class=\"value\">" + hours
-            //if (minutes < 10)
-            //    content += ":0" + minutes;
-            //else
-            //    content += ":" + minutes;
-            //if (rest < 10)
-            //    content += ":0" + rest + " time in call.</span><br/>";
-            //else
-            //    content += ":" + rest + " time in call.</span><br/>";
+        var chart = this;
+        var content;
+        content = "<span class=\"name\">ID:</span><span class=\"value\"> " + data.name + "</span><br/>";
 
-            //content += "<span class=\"name\">Sms: </span><span class=\"value\">" + data.smsStat + " messages.</span><br/>";
-            //content += "<span class=\"name\">Bluetooth: </span><span class=\"value\">" + data.btStat + " connections.</span><br/>";
-            return this.tooltip.showTooltip(content, d3.event);
-        }
+
+        return this.tooltip.showTooltip(content, d3.event);
+
     };
 
     WebChart.prototype.hide_details = function (data, i, element) {
+        this.vis.select("#personBars").remove();
         return this.tooltip.hideTooltip();
     };
 
@@ -576,10 +610,10 @@ WebChart = (function () {
                     level: i
                 };
                 point2 = {
-                    r: r * randomnumber,
+                    r: r ,
                     theta: theta,
-                    x: (r + randomnumber) * Math.cos(theta),// + translate.x,
-                    y: (r + randomnumber) * Math.sin(theta),// + translate.y,
+                    x: (r ) * Math.cos(theta),// + translate.x,
+                    y: (r ) * Math.sin(theta),// + translate.y,
                     level: i
                 };
                 points.all.push(point);
@@ -697,6 +731,10 @@ WebChart = (function () {
         return conns;
     };
 
+    WebChart.prototype.setTimelineRef = function (timelineRef) {
+        this.timelineRef = timelineRef;
+    };
+
     WebChart.euclideanDistance = function (a, b) {
         return Math.sqrt(Math.pow(b.x - a.x, 2) + Math.pow(b.y - a.y, 2));
     };
@@ -710,6 +748,8 @@ WebChart = (function () {
 
         return parallel;
     };
+
+
 
 
     return WebChart;

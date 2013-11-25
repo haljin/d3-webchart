@@ -6,7 +6,7 @@ DataProcessor = (function () {
 
     };
 
-    DataProcessor.parse_totals_data = function (cdata, sdata, bdata, start, end) {
+    DataProcessor.parse_totals_data = function (cdata, sdata, bdata) {
         var maxes = [0, 0, 0];
         var binData = function (timestamp, type) {
             var date = new Date(timestamp * 1000);
@@ -34,62 +34,60 @@ DataProcessor = (function () {
         }
         var results = [[], [], []];
         var bins = genTables();
-               
 
-        for(var i = 0; i < cdata.length; i++) {
-            if (cdata[i].timestamp > end) break;
-            if (cdata[i].timestamp > start) {
-                var found = false;
-                var newDate = new Date(cdata[i].timestamp * 1000);
-                var lastElem = results[0][results[0].length - 1];
-                binData(cdata[i].timestamp, 0);
-                if (lastElem && lastElem.date.toLocaleDateString() == newDate.toLocaleDateString()) {
-                    lastElem.count += 1;
-                }
-                else
-                    results[0].push({ date: newDate, count: 1 });
+
+        for (var i = 0; i < cdata.length; i++) {
+            var found = false;
+            var newDate = new Date(cdata[i].timestamp * 1000);
+            newDate.setHours(0, 0, 0, 0);
+            var lastElem = results[0][results[0].length - 1];
+            binData(cdata[i].timestamp, 0);
+            if (lastElem && lastElem.date.toLocaleDateString() == newDate.toLocaleDateString()) {
+                lastElem.count += 1;
             }
+            else
+                results[0].push({ date: newDate, count: 1 });
+
         };
 
         for (var i = 0; i < sdata.length; i++) {
-            if (sdata[i].timestamp > end) break;
-            if (sdata[i].timestamp > start) {
-                var found = false;
-                var newDate = new Date(sdata[i].timestamp * 1000);
-                var lastElem = results[1][results[1].length - 1];
-                binData(sdata[i].timestamp, 1);
-                if (lastElem && lastElem.date.toLocaleDateString() == newDate.toLocaleDateString()) {
-                    lastElem.count += 1;
-                }
-                else
-                    results[1].push({ date: newDate, count: 1 });
+
+            var found = false;
+            var newDate = new Date(sdata[i].timestamp * 1000);
+            newDate.setHours(0, 0, 0, 0);
+            var lastElem = results[1][results[1].length - 1];
+            binData(sdata[i].timestamp, 1);
+            if (lastElem && lastElem.date.toLocaleDateString() == newDate.toLocaleDateString()) {
+                lastElem.count += 1;
             }
+            else
+                results[1].push({ date: newDate, count: 1 });
+
         };
 
         for (var i = 0; i < bdata.length; i++) {
-            if (bdata[i].timestamp > end) break;
-            if (bdata[i].timestamp > start) {
-                var found = false;
-                var newDate = new Date(bdata[i].timestamp * 1000);
-                var lastElem = results[2][results[2].length - 1];
-                binData(bdata[i].timestamp, 2);
-                if (lastElem && lastElem.date.toLocaleDateString() == newDate.toLocaleDateString()) {
-                    lastElem.count += 1;
-                }
-                else
-                    results[2].push({ date: newDate, count: 1 });
+            var found = false;
+            var newDate = new Date(bdata[i].timestamp * 1000);
+            newDate.setHours(0, 0, 0, 0);
+            var lastElem = results[2][results[2].length - 1];
+            binData(bdata[i].timestamp, 2);
+            if (lastElem && lastElem.date.toLocaleDateString() == newDate.toLocaleDateString()) {
+                lastElem.count += 1;
             }
+            else
+                results[2].push({ date: newDate, count: 1 });
+
         };
 
         for (var i = 0; i < 3; i++) {
             bins[i].forEach(function (day) {
                 day.slots.forEach(function (slot) {
-                    if(maxes[i] != 0) slot.count /= maxes[i];
+                    if (maxes[i] != 0) slot.count /= maxes[i];
                 });
             });
         }
 
-        return { totals: results, bins: bins};
+        return { totals: results, bins: bins };
 
     };
 
@@ -116,86 +114,18 @@ DataProcessor = (function () {
     DataProcessor.parse_timeline_data = function (data) {
 
         var result = [[], [], []];
-        var maxc = 0, maxb = 0, maxs = 0;
-        for (var i = 0; i < data.length; i++) {
-            maxc = data[i].callcount > maxc ? data[i].callcount : maxc;
-            maxs = data[i].smscount > maxs ? data[i].smscount : maxs;
-            maxb = data[i].btcount > maxb ? data[i].btcount : maxb;
-        }
         //maxc = maxs = maxb = 1;
 
         for (var i = 0; i < data.length; i++) {
             var theDate = new Date(data[i].date);
             theDate.setHours(0, 0, 0, 0);
-            result[0].push({ date: theDate, x: i, y: data[i].callcount / maxc, y0: 0 });
-            result[1].push({ date: theDate, x: i, y: data[i].smscount / maxs, y0: data[i].callcount / maxc });
-            result[2].push({ date: theDate, x: i, y: data[i].btcount / maxb, y0: data[i].callcount / maxc + data[i].smscount / maxs });
+            result[0].push({ date: theDate, x: i, y: data[i].callcount});
+            result[1].push({ date: theDate, x: i, y: data[i].smscount});
+            result[2].push({ date: theDate, x: i, y: data[i].btcount});
         }
 
         return result;
     };
-
-
-
-    DataProcessor.parse_loc_data = function (data, accuracy, realName, start, end) {
-        var result = [];
-        var extractNumber = function (hash) {
-            return hash.substring(17, hash.length - 2)
-        }
-
-        var thisUser = function (d) {
-            var name;
-            switch (d.type) {
-                case "call":
-                    fake.forEach(function (l) {
-                        if (l.number == extractNumber(d.contact[0]))
-                            name = l.real_name;
-                    });
-                    break;
-                case "sms":
-                    fake.forEach(function (l) {
-                        if (l.number == extractNumber(d.contact[0]))
-                            name = l.real_name;
-                    });
-                    break;
-                case "bt":
-                    d.contact.forEach(function (x) {
-                        fake.forEach(function (l) {
-                            if (x == l.sensible_user_id)
-                                name = l.real_name;
-                        });
-                    });
-                    break;
-            }
-            return name == realName;
-
-        };
-
-        for (var i = 0; i < data.length; i++)
-        {
-            if (data[i].timestamp > end) break;
-            if (data[i].timestamp > start) {
-                var d = data[i];
-                var found = false;
-                if (thisUser(d)) {
-                    result.forEach(function (x) {
-                        if (Math.abs(x.lon - d.lon) < accuracy && Math.abs(x.lat - d.lat) < accuracy && x.type == d.type) {
-                            x.count += 1;
-                            found = true;
-                        }
-                    });
-
-                    if (!found) {
-                        d["count"] = 1;
-                        result.push(d);
-                    }
-                }
-            }
-        };
-
-        return result;
-    };
-
 
 
     DataProcessor.get_timeslot = function (timestamp) {
@@ -211,75 +141,6 @@ DataProcessor = (function () {
         else
             return DAYSLOT.AFTER;
     };
-
-
-
-
-
-
-    DataProcessor.gen_loc_data = function (btData, smsData, callData, locData) {
-        var results = { data: [] };
-
-
-        callData.forEach(function (d) {
-            var diff = locData[0].timestamp;
-            var closest = null;
-
-
-            for (var i = 0; i < locData.length; i++) {
-                if (Math.abs(locData[i].timestamp - d.timestamp) <= diff) {
-                    diff = Math.abs(locData[i].timestamp - d.timestamp);
-                    closest = locData[i];
-                }
-                else
-                    break;
-            };
-
-            results.data.push({timestamp: d.timestamp, lon: closest.location.longitude, lat: closest.location.latitude, type: "call", contact: [d.call.number] });
-        });
-
-        smsData.forEach(function (d) {
-            var diff = locData[0].timestamp;
-            var closest = null;
-
-
-            for (var i = 0; i < locData.length; i++) {
-                if (Math.abs(locData[i].timestamp - d.timestamp) <= diff) {
-                    diff = Math.abs(locData[i].timestamp - d.timestamp);
-                    closest = locData[i];
-                }
-                else
-                    break;
-            };
-
-            results.data.push({ timestamp: d.timestamp, lon: closest.location.longitude, lat: closest.location.latitude, type: "sms", contact: [d.message.address] });
-        });
-
-        btData.forEach(function (d) {
-            var diff = locData[0].timestamp;
-            var closest = null;
-            var name = [];
-
-            for (var i = 0; i < locData.length; i++) {
-                if (Math.abs(locData[i].timestamp - d.timestamp) <= diff) {
-                    diff = Math.abs(locData[i].timestamp - d.timestamp);
-                    closest = locData[i];
-                }
-                else
-                    break;
-            };
-            d.devices.forEach(function (x) {
-
-                name.push(x.sensible_user_id);
-            });
-            results.data.push({ timestamp: d.timestamp, lon: closest.location.longitude, lat: closest.location.latitude, type: "bt", contact: name });
-        });
-
-        return results;
-    };
-
-
-
 
     DataProcessor.gen_collective_data = function (btData, smsData, callData) {
         var result = [];
