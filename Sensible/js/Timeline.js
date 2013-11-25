@@ -83,6 +83,40 @@ Timeline = (function () {
             return chart.shapes[d];
         });
 
+        var button, button_text;
+        var group = this.svg.append("g")
+            .attr("id", "button-clear")
+            .attr("transform", "translate(1150, 300)")
+            .style("visibility", "hidden")
+            .on("click", function () {
+                chart.clear_all_selected();
+            })
+            .on("mouseover", function () {
+                button.attr("fill", "#B1B1B1");
+            })
+            .on("mouseout", function () {
+                button.attr("fill", "#dddddd");
+            });
+
+        button = group.append("rect")
+            .attr("x", 0)
+            .attr("y", 0)
+            .attr("width", 110)
+            .attr("height", 30)
+            .attr("fill", "#dddddd")
+            .attr("stroke", "#aaaaaa")
+            .attr("stroke-width", 0.25)
+            .style("cursor", "hand");
+
+        button_text = group.append("text")
+            .attr("x", 10)
+            .attr("y", 20)
+            .style("cursor", "hand")
+            .style("font-family", "Segoe UI")
+            .style("font-size", "20px")
+            .style("font-variant", "small-caps")
+            .style("font-weight", "bold")
+            .text("Clear All");
     };
 
     // calendar chart
@@ -230,7 +264,7 @@ Timeline = (function () {
                 });
 
         }
-
+        this.svg.select("#button-clear").style("visibility", "visible");
         this.svg.selectAll(".brush").each(function () {
             this.parentNode.appendChild(this);
         });
@@ -265,6 +299,7 @@ Timeline = (function () {
                 });
 
         }
+        this.svg.select("#button-clear").style("visibility", "hidden");
     };
 
     Timeline.prototype.clear_all_selected = function () {

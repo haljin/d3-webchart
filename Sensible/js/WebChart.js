@@ -348,7 +348,37 @@ WebChart = (function () {
                     .style("stroke-dasharray", "15 5")
                     .style("stroke", "#000")
                 .attr("opacity", 0.5);
-            }              
+            }
+
+            this.web[channel].append("image")
+                .attr("id", "userAvatar-" + channel)
+                .attr("class", "avatar")
+                .attr("xlink:href", "data/unknown-person.gif")
+                .attr("x", -25)
+                .attr("y", -45)
+                .attr("width", 50)
+                .attr("height", 90);
+
+            this.web[channel].append("polyline")
+                //.attr("transform", function () {
+                //    switch (channel) {
+                //        case 0:
+                //            return "translate(5, 5)";
+                //        case 1:
+                //            return "translate(3, 7)";
+                //        case 2:
+                //            return "translate(7, 4)";
+                //    }
+                //}) 
+                .attr("transform", "translate(-150,-150)")
+                .attr("stroke", function () {
+                    return chart.colors[channel];
+                })
+                .style("stroke-width", "2px")
+                .style("fill", "none")
+                .attr("points", function () {
+                    return chart.shapes[channel];
+        });
         }  
 
         
@@ -458,11 +488,15 @@ WebChart = (function () {
                     }
                     d.clicked = !d.clicked;
                 });
+
+
+
         }
 
 
 
         this.circles.bt.transition().duration(500).attr("r", function (d) {
+            if (d.btScore == 0) return 0;
             return d.radius;
         }).each("end", function () {
             d3.select(this).transition().duration(500)
@@ -475,6 +509,7 @@ WebChart = (function () {
         });
 
         this.circles.call.transition().duration(500).attr("r", function (d) {
+            if (d.callScore == 0) return 0;
             return d.radius;
         }).each("end", function () {
             d3.select(this).transition().duration(500)
@@ -486,6 +521,7 @@ WebChart = (function () {
             })
         });
         this.circles.sms.transition().duration(500).attr("r", function (d) {
+            if (d.smsScore == 0) return 0;
             return d.radius;
         }).each("end", function () {
             d3.select(this).transition().duration(500)
