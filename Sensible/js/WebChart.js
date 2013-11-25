@@ -433,11 +433,9 @@ WebChart = (function () {
                        if (!d.clicked) {
                            chart.vis.selectAll("#" + id)
                                .attr("fill", function (d) {
-                                   return d3.rgb(chart.colors[this.getAttribute("class")]).brighter().brighter();
-                               })
-                               .attr("stroke", function (d) {
                                    return d3.rgb(chart.colors[this.getAttribute("class")]).brighter();
-                               });
+                               })
+                               .attr("stroke", d3.rgb("#ff0000"));
                        }
                        else {
                            chart.vis.selectAll("#" + id)
@@ -608,6 +606,33 @@ WebChart = (function () {
         var chart = this;
         var content;
         content = "<span class=\"name\">ID:</span><span class=\"value\"> " + data.name + "</span><br/>";
+        var channel = d3.select(element).attr("class");
+        switch (channel) {
+            case "bt":
+                content += "<span class=\"name\">Bluetooth: </span><span class=\"value\">" + data.btStat + " connections.</span><br />";
+                break;
+            case "sms":
+                content += "<span class=\"name\">Sms: </span><span class=\"value\">" + data.smsStat + " messages.</span><br />";
+                break;
+            case "call":
+                var rest;
+                var hours = Math.floor(data.callStat / 3600);
+                rest = data.callStat % 3600;
+                var minutes = Math.floor(rest / 60);
+                rest = rest % 60;
+
+                content += "<span class=\"name\">Calls: </span><span class=\"value\">" + hours;
+                if (minutes < 10)
+                    content += ":0" + minutes;
+                else
+                    content += ":" + minutes;
+                if (rest < 10)
+                    content += ":0" + rest + " time in call.</span><br/>";
+                else
+                    content += ":" + rest + " time in call.</span><br/>";
+                break;
+        }
+
 
 
         return this.tooltip.showTooltip(content, d3.event);
