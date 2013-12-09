@@ -337,7 +337,6 @@ WebChart = (function () {
 
             //Draw the web radial lines
             for (segment = 0; segment < chart.segments; segment++) {
-                //console.debug(chart.points.bySegment[segment]);
                 var start = chart.points.bySegment[segment][0];
                 var end = chart.points.bySegment[segment][chart.levels-1];
                 this.web[channel].append("line")
@@ -360,16 +359,6 @@ WebChart = (function () {
                 .attr("height", 90);
 
             this.web[channel].append("polyline")
-                //.attr("transform", function () {
-                //    switch (channel) {
-                //        case 0:
-                //            return "translate(5, 5)";
-                //        case 1:
-                //            return "translate(3, 7)";
-                //        case 2:
-                //            return "translate(7, 4)";
-                //    }
-                //}) 
                 .attr("transform", "translate(-150,-150)")
                 .attr("stroke", function () {
                     return chart.colors[channel];
@@ -390,7 +379,7 @@ WebChart = (function () {
     ********************************************************************************/
     WebChart.prototype.update_vis = function () {
         var chart = this;
-
+        this.vis.selectAll(".connection").remove();
         var channels = { bt: { x: 0, y: -100 }, sms: { x: -300, y: 200 }, call: { x: 300, y: 200 } };
         //Draw web for each channel
         for (channel in channels) {
@@ -499,11 +488,15 @@ WebChart = (function () {
         }).each("end", function () {
             d3.select(this).transition().duration(500)
             .attr("cx", function (d) {
+                chart.locationDictionary[d.name] = { x: d.friendScales.bt(d.btScore).x };
                 return d.friendScales.bt(d.btScore).x;
             })
             .attr("cy", function (d) {
+                chart.locationDictionary[d.name]["y"] = d.friendScales.bt(d.btScore).y;
                 return d.friendScales.bt(d.btScore).y;
-            })
+            }).each("end", function () {
+                chart.draw_connections("bt");
+            });
         });
 
         this.circles.call.transition().duration(500).attr("r", function (d) {
@@ -539,7 +532,7 @@ WebChart = (function () {
     *   FUNCTION: draw_connections                                                  *
     *   Draw the connections between the nodes.                                     *   
     ********************************************************************************/
-    WebChart.prototype.draw_connections = function () {
+    WebChart.prototype.draw_connections = function (type) {
         var chart = this;
         var getRandomArbitary = function (min, max) {
             return Math.random() * (max - min) + min;
@@ -549,7 +542,7 @@ WebChart = (function () {
         }
 
 
-        this.web.bt.selectAll(".connection").data(chart.getConnections(chart.displayedNodes)).enter()
+        this.web[type].selectAll(".connection").data(chart.getConnections(chart.displayedNodes)).enter()
         .append("path")
         .attr("class", "connection")
         .attr("stroke", "#000000")
@@ -595,7 +588,7 @@ WebChart = (function () {
         this.vis.select("#userAvatarMain").each(function () {
             this.parentNode.appendChild(this);
         });
-        this.web.bt.selectAll("circle").each(function () {
+        this.web[type].selectAll("circle").each(function () {
             this.parentNode.appendChild(this);
         });
 
