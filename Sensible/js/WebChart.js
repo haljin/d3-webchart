@@ -27,7 +27,7 @@ WebChart = (function () {
         this.radius_scale;
         this.friendScales = [];
         this.unusedScales = [];
-        this.colorScale = d3.scale.pow().exponent(0.95).range([0.1, 1]);//"#00000000", "#000000FF"]);
+        this.colorScale = d3.scale.pow().exponent(0.95).range([0.3, 1]);//"#00000000", "#000000FF"]);
         this.strokeScale = d3.scale.pow().exponent(0.95).rangeRound([2, 4]).clamp(true);//"#00000000", "#000000FF"]);
         this.locationDictionary = {};
 
@@ -67,6 +67,8 @@ WebChart = (function () {
         //Control fields	
         this.tooltip = CustomTooltip("gates_tooltip", 300);
         this.circles = { bt: null, call: null, sms: null };
+        this.comms = { bt: null, call: null, sms: null };
+        this.connections = { bt: null, call: null, sms: null };
         this.realStartTime;
         this.startTime;
         this.endTime;
@@ -195,6 +197,7 @@ WebChart = (function () {
         for (var i = 0 ; i < chart.segments ; i++) {
             var pa = chart.points.byLevel[chart.levels-1][i], pb = chart.points.byLevel[0][i];
             chart.friendScales.push({
+                segment: i,
                 bt: d3.scale.linear().range([pa, pb]),
                 call: d3.scale.linear().range([pa, pb]),
                 sms: d3.scale.linear().range([pa, pb]),
@@ -300,9 +303,11 @@ WebChart = (function () {
                 chart.displayedNodes[i].colData = DataProcessor.parse_totals_data(chart.displayedNodes[i].callData, chart.displayedNodes[i].smsData, chart.displayedNodes[i].btData);
         }
 
-        //chart.displayedNodes = chart.placeGreedy();
+        chart.connections.bt = this.getConnections(this.displayedNodes);
+        var people = this.displayedNodes.map(function(d) {return d.name});
+        chart.comms.bt = louvain.best_communities(new Graph(people, chart.connections.bt));
 
-        
+        chart.displayedNodes = chart.placeComms();
 
         chart.displayedNodes.forEach(function (d, i) {
             if(d.friendScales == null)
@@ -333,12 +338,25 @@ WebChart = (function () {
         {
             this.web[channel] = this.vis.append("g").attr("id", "Web-" + channel);
             
-            this.web[channel].attr("transform", "translate(" + (chart.center.x + channels[channel].x) + ", " + (chart.center.y + channels[channel].y) + ")");
+            this.web[channel].attr("transform", "translate(" + (chart.center.x + channels[channel].x) + ", " + (chart.center.y + channels[channel].y) + ") scale(1.1,1.1)");
 
             //Draw the web radial lines
+
+
             for (segment = 0; segment < chart.segments; segment++) {
                 var start = chart.points.bySegment[segment][0];
-                var end = chart.points.bySegment[segment][chart.levels-1];
+                var end = chart.points.bySegment[segment][chart.levels - 1];
+                var next = (segment == chart.segments - 1) ? chart.points.bySegment[0][chart.levels - 1] : chart.points.bySegment[segment + 1][chart.levels - 1];
+                var prev = (segment == 0) ? chart.points.bySegment[chart.segments - 1][chart.levels - 1] : chart.points.bySegment[segment - 1][chart.levels - 1];
+                var midPt1 = { x: (end.x + next.x) / 2 * 1.1, y: (end.y + next.y) / 2 * 1.1 }, midPt2 = { x: (end.x + prev.x) / 2 * 1.1, y: (end.y + prev.y) / 2 * 1.1 };
+
+                this.web[channel].append("polygon")
+                    .attr("points", 0 + "," + 0 + "," + midPt1.x + "," + midPt1.y + "," + midPt2.x + "," + midPt2.y)
+                    .attr("id", "communitybg_" + segment)
+                    .attr("opacity", 0.15)
+                    .attr("class", "community")
+                    .style("fill", "#ffffff");
+                //start - srodek
                 this.web[channel].append("line")
                     .attr("x1", start.x)
                     .attr("y1", start.y)
@@ -346,7 +364,7 @@ WebChart = (function () {
                     .attr("y2", end.y)
                     .style("stroke-dasharray", "15 5")
                     .style("stroke", "#000")
-                .attr("opacity", 0.5);
+                    .attr("opacity", 0.5);
             }
 
             this.web[channel].append("image")
@@ -380,7 +398,10 @@ WebChart = (function () {
     WebChart.prototype.update_vis = function () {
         var chart = this;
         this.vis.selectAll(".connection").remove();
+        this.vis.selectAll(".community").style("fill", "#ffffff");
+
         var channels = { bt: { x: 0, y: -100 }, sms: { x: -300, y: 200 }, call: { x: 300, y: 200 } };
+        
         //Draw web for each channel
         for (channel in channels) {
             this.circles[channel] = this.web[channel].selectAll("circle")
@@ -480,7 +501,7 @@ WebChart = (function () {
 
         }
 
-
+        var runonce = false;
 
         this.circles.bt.transition().duration(500).attr("r", function (d) {
             if (d.btScore == 0) return 0;
@@ -494,8 +515,15 @@ WebChart = (function () {
             .attr("cy", function (d) {
                 chart.locationDictionary[d.name]["y"] = d.friendScales.bt(d.btScore).y;
                 return d.friendScales.bt(d.btScore).y;
-            }).each("end", function () {
-                chart.draw_connections("bt");
+            }).each("end", function (d) {
+                chart.web.bt.selectAll("#communitybg_" + d.friendScales.segment)
+                .transition()
+                .style("fill", chart.clusterColors[d.cluster]);
+
+                if (!runonce) {
+                    runonce = true;
+                    chart.draw_connections("bt");
+                }
             });
         });
 
@@ -541,15 +569,15 @@ WebChart = (function () {
             return Math.sqrt(Math.pow(b.x - a.x, 2) + Math.pow(b.y - a.y, 2));
         }
 
+        var data = this.connections.bt; 
 
-        this.web[type].selectAll(".connection").data(chart.getConnections(chart.displayedNodes)).enter()
+        this.web[type].selectAll(".connection").data(data).enter()
         .append("path")
         .attr("class", "connection")
         .attr("stroke", "#000000")
         .attr("opacity", 0)
         .attr("stroke-width", function (d) {
-            //d["opacity"] = chart.strokeScale(d.score);
-            return chart.strokeScale(d.score) + "px";
+            return "2px";
         })
         .attr("fill", "none")
         .attr("d", function (d) {
@@ -557,25 +585,18 @@ WebChart = (function () {
             var nextPoint = chart.locationDictionary[d.b];
             var nextPoint1Control = { x: 0, y: 0 }, nextPoint2Control = { x: 0, y: 0 };
             var parallel = WebChart.getParallel(point, nextPoint);
-            //var parallel = { x: nextPoint.y - point.y, y: nextPoint.x - point.x };
-            //var dist = eucDist(nextPoint, point);
-            //parallel.x /= dist;
-            //parallel.y /= dist;
             var midPoint = { x: point.x + (nextPoint.x - point.x) / 2 - parallel.x, y: point.y + (nextPoint.y - point.y) / 2 + parallel.y },
                 midPoint2 = { x: point.x + (nextPoint.x - point.x) / 2 + parallel.x, y: point.y + (nextPoint.y - point.y) / 2 - parallel.y };
             var modifier = 1;
             if (eucDist(midPoint, { x: 0, y: 0 }) > eucDist(midPoint2, { x: 0, y: 0 }))
                 modifier = -1;
 
-            nextPoint1Control.x = point.x + (nextPoint.x - point.x) / 3 - modifier * getRandomArbitary(20, 45) * parallel.x;
-            nextPoint1Control.y = point.y + (nextPoint.y - point.y) / 3 + modifier * getRandomArbitary(20, 45) * parallel.y;
-            nextPoint2Control.x = point.x + (nextPoint.x - point.x) / 3 * 2 - modifier * getRandomArbitary(20, 45) * parallel.x;
-            nextPoint2Control.y = point.y + (nextPoint.y - point.y) / 3 * 2 + modifier * getRandomArbitary(20, 45) * parallel.y;
-            //if (modifier == 1)
-            //    chart.web.bt.selectAll(".debug").data([1]).enter().append("circle").attr("cx", midPoint.x).attr("cy", midPoint.y).attr("r",5).attr("fill", "#FF0000");
-            //else
-            //    chart.web.bt.selectAll(".debug").data([1]).enter().append("circle").attr("cx", midPoint2.x).attr("cy", midPoint2.y).attr("r",5).attr("fill", "#0000FF");
-
+            //Point in 1/3 of the way between start and end
+            nextPoint1Control.x = point.x + (nextPoint.x - point.x) / 3 - modifier * getRandomArbitary(10, 25) * parallel.x;
+            nextPoint1Control.y = point.y + (nextPoint.y - point.y) / 3 + modifier * getRandomArbitary(10, 25) * parallel.y;
+            //Point in 2/3 of the way between start and end
+            nextPoint2Control.x = point.x + (nextPoint.x - point.x) / 3 * 2 - modifier * getRandomArbitary(10, 25) * parallel.x;
+            nextPoint2Control.y = point.y + (nextPoint.y - point.y) / 3 * 2 + modifier * getRandomArbitary(10, 25) * parallel.y;
 
             return " M " + point.x + "," + point.y + " C " + nextPoint1Control.x + "," + nextPoint1Control.y + " "
                         + nextPoint2Control.x + "," + nextPoint2Control.y + " " + nextPoint.x + "," + nextPoint.y;
@@ -678,6 +699,26 @@ WebChart = (function () {
         return points;
     };
 
+    WebChart.prototype.placeComms = function () {
+        var newPlacement = [];
+        var aux = {};
+        for (var i = 0; i < this.displayedNodes.length; i++) {
+            var person = this.displayedNodes[i];
+            if (aux[this.comms.bt[person.name]] === undefined)
+                aux[this.comms.bt[person.name]] = [];
+            aux[this.comms.bt[person.name]].push(person)
+        }
+
+        for (community in aux) {
+            aux[community].forEach(function (d) {
+                d.cluster = community;
+                newPlacement.push(d);
+            })
+        }
+
+        return newPlacement;
+
+    };
 
     WebChart.prototype.placeGreedy = function () {
         var positions = [];
@@ -751,38 +792,22 @@ WebChart = (function () {
                     conns.push({ a: nodes[i].name, b: nb, score: nodes[i].nbScores[nb] });
             }
         }
-        if (conns.length > 0) {
-            var maxNbScore = 0, minNbScore = conns[0].score, avgNbScore = { score: 0, count: 0 };
-            for (var i = 0; i < conns.length; i++) {
-                if (conns[i].score > maxNbScore)
-                    maxNbScore = conns[i].score;
-                if (conns[i].score > 0) {
-                    avgNbScore.score += conns[i].score;
-                    avgNbScore.count++;
-                }
+        var tresholded = WebChart.tresholdEdges(chart.displayedNodes, conns, 0.15);
+
+        if (tresholded.length > 0) {
+            var maxNbScore = 0, minNbScore = tresholded[0].score;
+            for (var i = 0; i < tresholded.length; i++) {
+                if (tresholded[i].score > maxNbScore)
+                    maxNbScore = tresholded[i].score;
+                else if (tresholded[i].score < minNbScore)
+                    minNbScore = tresholded[i].score;
             }
 
-            var stdDev = 0, avg = avgNbScore.score / avgNbScore.count
-            for (var i = 0; i < conns.length; i++) {
-                if (conns[i].score > 0)
-                    stdDev += Math.pow(conns[i].score - avg, 2);
-            }
-            stdDev *= (1 / (avgNbScore.count - 1))
-            stdDev = Math.sqrt(stdDev);
-
-            conns.sort(function (a, b) { return b.score - a.score });
-
-            var cut;
-            //TUTAJ ZMIENIC ZAKOMENTOWAC I DAC ZERA
-            for (cut = 0; cut < conns.length; cut++)
-                if (conns[cut].score < avg) break;
-            conns = conns.splice(0, cut);
-
-            chart.colorScale.domain([avg, maxNbScore]);
-            chart.strokeScale.domain([avg, maxNbScore]);
+            chart.colorScale.domain([minNbScore, maxNbScore]);
+            chart.strokeScale.domain([minNbScore, maxNbScore]);
 
         }
-        return conns;
+        return tresholded;
     };
 
     WebChart.prototype.setTimelineRef = function (timelineRef) {
@@ -803,6 +828,62 @@ WebChart = (function () {
         return parallel;
     };
 
+    WebChart.tresholdEdges = function (nodes, edges, alpha) {
+        var __degree = function (edges, node, weighted) {
+            var result = 0;
+            for (var i = 0; i < edges.length; i++) {
+                if (edges[i].a == node || edges[i].b == node)
+                    result +=  weighted ? edges[i].score : 1;
+            };
+            return result;
+        };
+        var __nbs = function (edges, node) {
+            var result = [];
+            for (var i = 0; i < edges.length; i++) {
+                if (edges[i].a == node)
+                    result.push({ nb: edges[i].b, score: edges[i].score });
+                else if (edges[i].b == node)
+                    result.push({ nb: edges[i].a, score: edges[i].score });
+            };
+            return result;
+        };
+        // integral of (1-x)^(k_n-2)
+        var integral = function (x) {
+            return -(Math.pow(1 - x, k_n - 1) / k_n - 1);
+        };
+
+
+        var tresholdedEdges = [];
+
+        for (var i = 0; i < nodes.length; i++) {
+            var k_n = __degree(edges, nodes[i].name, false);
+            if (k_n > 1) {
+                var sum_w = __degree(edges, nodes[i].name, true);
+                var nbs = __nbs(edges, nodes[i].name);
+                
+                for (var j = 0; j < nbs.length; j++) {
+                    var edgeW = nbs[j].score;
+                    var p_ij = edgeW / sum_w;
+                    var alpha_ij = 1 - (k_n - 1) * (integral(p_ij) - integral(0));
+                    if (alpha_ij < alpha) {
+                        var found = false;
+                        for (var e = 0; e < tresholdedEdges.length; e++) {
+                            if (tresholdedEdges[e].a == nbs[j].nb && tresholdedEdges[e].b == nodes[i].name)
+                                found = true;
+                        }
+                        if (!found)
+                            tresholdedEdges.push({
+                                a: nodes[i].name,
+                                b: nbs[j].nb,
+                                score: nbs[j].score
+                            });
+                        
+                    }
+                }
+            }
+        }
+        return tresholdedEdges;
+    };
 
 
 
