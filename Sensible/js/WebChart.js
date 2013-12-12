@@ -18,6 +18,7 @@ WebChart = (function () {
             bt: "00,07 05,10 05,00 12,05 05,10 12,15 05,20 05,10 00,13"
         };
         this.clusterColors = ["#ff0000", "#00ff00", "#0000ff", "#ffff00", "#ff00ff", "#00ffff", "#880000", "#008800", "#000088", "#888800", "#880088", "#008888", "#000000", "#ffffff", "#888888", "#444444"];
+        //this.clusterColors = ["#467302", "#274001", "#172601", "#C9F235", "#8C2016", "#D9411E", "#F28322", "#F2B707", "#9C153A", "#DECED0", "#611255", "#3F1548", "#CCBDB8", "#999391", "#666261", "#333131"];
 
         //Web layout fields
         this.web = { bt: null, call: null, sms: null };
@@ -353,7 +354,7 @@ WebChart = (function () {
                 this.web[channel].append("polygon")
                     .attr("points", 0 + "," + 0 + "," + midPt1.x + "," + midPt1.y + "," + midPt2.x + "," + midPt2.y)
                     .attr("id", "communitybg_" + segment)
-                    .attr("opacity", 0.15)
+                    .attr("opacity", 0.5)
                     .attr("class", "community")
                     .style("fill", "#ffffff");
                 //start - srodek
@@ -440,38 +441,71 @@ WebChart = (function () {
                    })
                    .on("mouseover", function (d, i) {
                        var id = this.getAttribute("id");
-                       if (!d.clicked) {
-                           chart.vis.selectAll("#" + id)
-                               .attr("fill", function (d) {
-                                   return d3.rgb(chart.colors[this.getAttribute("class")]).brighter();
-                               })
-                               .attr("stroke", d3.rgb("#ff0000"));
-                       }
-                       else {
-                           chart.vis.selectAll("#" + id)
-                               .attr("fill", d3.rgb("#ff9896").brighter())
-                               .attr("stroke", d3.rgb("#d62728").brighter());
+                       var connected = [d.name];
 
-                       }
+                       chart.vis.selectAll(".connection").transition().duration(500)
+                           .attr("stroke-width", function (c) {
+                               if (c.a == d.name)
+                                   connected.push(c.b);
+                               else if (c.b == d.name)
+                                   connected.push(c.a);
+                               else
+                                   return 0 + "px";
+                               //return c.opacity * 2 + "px";
+                               return chart.strokeScale(c.score) + "px";
+                           });
+                       chart.vis.selectAll("circle").transition().duration(500)
+                           .attr("opacity", function (circle) {
+                               if (connected.indexOf(circle.name) > -1)
+                                   return 1;
+                               else
+                                   return 0.05;
+                           });
+
+
+                       //if (!d.clicked) {
+                       //    chart.vis.selectAll("#" + id)
+                       //        .attr("fill", function (d) {
+                       //            return d3.rgb(chart.colors[this.getAttribute("class")]).brighter();
+                       //        })
+                       //        .attr("stroke", d3.rgb("#ff0000"));
+                       //}
+                       //else {
+                       //    chart.vis.selectAll("#" + id)
+                       //        .attr("fill", d3.rgb("#ff9896").brighter())
+                       //        .attr("stroke", d3.rgb("#d62728").brighter());
+
+                       //}
                         return chart.show_details(d, i, this);
                     })
                     .on("mouseout", function (d, i) {
-                        var id = this.getAttribute("id");
-                        if (!d.clicked) {
-                            chart.vis.selectAll("#" + id)
-                                .attr("fill", function (d) {
-                                    return chart.colors[this.getAttribute("class")];
-                                })
-                                .attr("stroke", function (d) {
-                                    return d3.rgb(chart.colors[this.getAttribute("class")]).darker();
-                                });
-                        }
-                        else {
-                            chart.vis.selectAll("#" + id)
-                                .attr("fill", d3.rgb("#ff9896"))
-                                .attr("stroke", d3.rgb("#d62728"));
 
-                        }
+                        chart.vis.selectAll(".connection").transition().duration(500)
+                                       .attr("stroke-width", function (c) {
+                                               return chart.strokeScale(c.score) + "px";
+                                           });
+                        chart.vis.selectAll("circle").transition().duration(500)
+                                        .attr("opacity", function (circle) {
+                                                return 1;                    
+                                            });
+
+
+                        //var id = this.getAttribute("id");
+                        //if (!d.clicked) {
+                        //    chart.vis.selectAll("#" + id)
+                        //        .attr("fill", function (d) {
+                        //            return chart.colors[this.getAttribute("class")];
+                        //        })
+                        //        .attr("stroke", function (d) {
+                        //            return d3.rgb(chart.colors[this.getAttribute("class")]).darker();
+                        //        });
+                        //}
+                        //else {
+                        //    chart.vis.selectAll("#" + id)
+                        //        .attr("fill", d3.rgb("#ff9896"))
+                        //        .attr("stroke", d3.rgb("#d62728"));
+
+                        //}
                         return chart.hide_details(d, i, this);
                     })
                 .on("click", function (d) {
