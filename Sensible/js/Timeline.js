@@ -6,6 +6,7 @@ Timeline = (function () {
         this.height = 350;
         this.data = DataProcessor.parse_timeline_data(timelineData);
         this.highlightedData = [[], [], []];
+        this.selected = 0;
         this.svg = d3.select("#timeline").append("svg").attr("width", "100%").attr("height", "100%").attr("id", "svg_timeline").style("display", "inline-block");
         this.colors = { call: "#b1f413", sms: "#ffd314", bt: "#7f1ac3" };
         this.baseUrl = "http://localhost:5777/Sensible/data";
@@ -27,7 +28,7 @@ Timeline = (function () {
         this.xscale = d3.time.scale().range([0, this.width]).domain([this.starting, this.ending]);
         this.yscale = {};
         this.xAxis = d3.svg.axis().scale(this.xscale).orient("bottom");
-
+        
         var newDate = new Date();
         this.barInterval = this.xscale(new Date()) - this.xscale((new Date()).setDate(newDate.getDate() - 1)) - 1;
 
@@ -237,7 +238,7 @@ Timeline = (function () {
                 }
             }
         }
-
+       
         for (var ind = 0; ind < 3; ind++) {
             var mode = modes[ind];
             var barGrp = this.svg.select("#timelineBars-" + mode);
@@ -264,6 +265,7 @@ Timeline = (function () {
                 });
 
         }
+        this.selected++;
         this.svg.select("#button-clear").style("visibility", "visible");
         this.svg.selectAll(".brush").each(function () {
             this.parentNode.appendChild(this);
@@ -299,7 +301,10 @@ Timeline = (function () {
                 });
 
         }
-        this.svg.select("#button-clear").style("visibility", "hidden");
+        this.selected--;
+
+        if (this.selected == 0)
+            this.svg.select("#button-clear").style("visibility", "hidden");
     };
 
     Timeline.prototype.clear_all_selected = function () {

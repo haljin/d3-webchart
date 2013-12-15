@@ -17,7 +17,7 @@ WebChart = (function () {
             sms: "00,00 25,00 25,15 00,15 00,00 13,7 25,00",
             bt: "00,07 05,10 05,00 12,05 05,10 12,15 05,20 05,10 00,13"
         };
-        this.clusterColors = ["#ff0000", "#00ff00", "#0000ff", "#ffff00", "#ff00ff", "#00ffff", "#880000", "#008800", "#000088", "#888800", "#880088", "#008888", "#000000", "#ffffff", "#888888", "#444444"];
+        this.clusterColors = d3.scale.category20();//["#ff0000", "#00ff00", "#0000ff", "#ffff00", "#ff00ff", "#00ffff", "#880000", "#008800", "#000088", "#888800", "#880088", "#008888", "#000000", "#ffffff", "#888888", "#444444"];
         //this.clusterColors = ["#467302", "#274001", "#172601", "#C9F235", "#8C2016", "#D9411E", "#F28322", "#F2B707", "#9C153A", "#DECED0", "#611255", "#3F1548", "#CCBDB8", "#999391", "#666261", "#333131"];
 
         //Web layout fields
@@ -354,7 +354,7 @@ WebChart = (function () {
                 this.web[channel].append("polygon")
                     .attr("points", 0 + "," + 0 + "," + midPt1.x + "," + midPt1.y + "," + midPt2.x + "," + midPt2.y)
                     .attr("id", "communitybg_" + segment)
-                    .attr("opacity", 0.5)
+                    .attr("opacity", 0.25)
                     .attr("class", "community")
                     .style("fill", "#ffffff");
                 //start - srodek
@@ -459,23 +459,21 @@ WebChart = (function () {
                                if (connected.indexOf(circle.name) > -1)
                                    return 1;
                                else
-                                   return 0.05;
+                                   return 0.2;
                            });
+                       if (!d.clicked) {
+                           chart.vis.selectAll("#" + id)
+                               .attr("fill", function (d) {
+                                   return d3.rgb(chart.colors[this.getAttribute("class")]).brighter();
+                               })
+                               .attr("stroke", d3.rgb("#ff0000"));
+                       }
+                       else {
+                           chart.vis.selectAll("#" + id)
+                               .attr("fill", d3.rgb("#ff9896").brighter())
+                               .attr("stroke", d3.rgb("#d62728").brighter());
 
-
-                       //if (!d.clicked) {
-                       //    chart.vis.selectAll("#" + id)
-                       //        .attr("fill", function (d) {
-                       //            return d3.rgb(chart.colors[this.getAttribute("class")]).brighter();
-                       //        })
-                       //        .attr("stroke", d3.rgb("#ff0000"));
-                       //}
-                       //else {
-                       //    chart.vis.selectAll("#" + id)
-                       //        .attr("fill", d3.rgb("#ff9896").brighter())
-                       //        .attr("stroke", d3.rgb("#d62728").brighter());
-
-                       //}
+                       }
                         return chart.show_details(d, i, this);
                     })
                     .on("mouseout", function (d, i) {
@@ -488,24 +486,22 @@ WebChart = (function () {
                                         .attr("opacity", function (circle) {
                                                 return 1;                    
                                             });
+                        var id = this.getAttribute("id");
+                        if (!d.clicked) {
+                            chart.vis.selectAll("#" + id)
+                                .attr("fill", function (d) {
+                                    return chart.colors[this.getAttribute("class")];
+                                })
+                                .attr("stroke", function (d) {
+                                    return d3.rgb(chart.colors[this.getAttribute("class")]).darker();
+                                });
+                        }
+                        else {
+                            chart.vis.selectAll("#" + id)
+                                .attr("fill", d3.rgb("#ff9896"))
+                                .attr("stroke", d3.rgb("#d62728"));
 
-
-                        //var id = this.getAttribute("id");
-                        //if (!d.clicked) {
-                        //    chart.vis.selectAll("#" + id)
-                        //        .attr("fill", function (d) {
-                        //            return chart.colors[this.getAttribute("class")];
-                        //        })
-                        //        .attr("stroke", function (d) {
-                        //            return d3.rgb(chart.colors[this.getAttribute("class")]).darker();
-                        //        });
-                        //}
-                        //else {
-                        //    chart.vis.selectAll("#" + id)
-                        //        .attr("fill", d3.rgb("#ff9896"))
-                        //        .attr("stroke", d3.rgb("#d62728"));
-
-                        //}
+                        }
                         return chart.hide_details(d, i, this);
                     })
                 .on("click", function (d) {
@@ -552,7 +548,7 @@ WebChart = (function () {
             }).each("end", function (d) {
                 chart.web.bt.selectAll("#communitybg_" + d.friendScales.segment)
                 .transition()
-                .style("fill", chart.clusterColors[d.cluster]);
+                .style("fill", chart.clusterColors(d.cluster));
 
                 if (!runonce) {
                     runonce = true;
@@ -826,7 +822,7 @@ WebChart = (function () {
                     conns.push({ a: nodes[i].name, b: nb, score: nodes[i].nbScores[nb] });
             }
         }
-        var tresholded = WebChart.tresholdEdges(chart.displayedNodes, conns, 0.15);
+        var tresholded = WebChart.tresholdEdges(chart.displayedNodes, conns, 0.2);
 
         if (tresholded.length > 0) {
             var maxNbScore = 0, minNbScore = tresholded[0].score;
