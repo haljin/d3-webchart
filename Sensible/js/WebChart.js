@@ -65,7 +65,8 @@ WebChart = (function () {
             }
         }
 
-        //Control fields	
+        //Control fields
+        this.loaded = false;
         this.tooltip = CustomTooltip("gates_tooltip", 300);
         this.circles = { bt: null, call: null, sms: null };
         this.comms = { bt: null, call: null, sms: null };
@@ -74,6 +75,7 @@ WebChart = (function () {
         this.startTime;
         this.endTime;
         this.timelineRef;
+        this.helpRef = null;
 
         var date = new Date(Date.now());
         var obj = this;
@@ -386,10 +388,10 @@ WebChart = (function () {
                 .style("fill", "none")
                 .attr("points", function () {
                     return chart.shapes[channel];
-        });
-        }  
-
-        
+                });
+        }
+        this.helpRef = new ChartHelp(this.vis, this.width, this.height);
+     
     };
 
     /********************************************************************************
@@ -440,95 +442,97 @@ WebChart = (function () {
                        return "bubble_" + d.id;
                    })
                    .on("mouseover", function (d, i) {
-                       var id = this.getAttribute("id");
-                       var connected = [d.name];
+                       if (chart.loaded) {
+                           var id = this.getAttribute("id");
+                           var connected = [d.name];
 
-                       chart.vis.selectAll(".connection").transition().duration(500)
-                           .attr("stroke-width", function (c) {
-                               if (c.a == d.name)
-                                   connected.push(c.b);
-                               else if (c.b == d.name)
-                                   connected.push(c.a);
-                               else
-                                   return 0 + "px";
-                               //return c.opacity * 2 + "px";
-                               return chart.strokeScale(c.score) + "px";
-                           });
-                       chart.vis.selectAll("circle").transition().duration(500)
-                           .attr("opacity", function (circle) {
-                               if (connected.indexOf(circle.name) > -1)
-                                   return 1;
-                               else
-                                   return 0.2;
-                           });
-                       if (!d.clicked) {
-                           chart.vis.selectAll("#" + id)
-                               .attr("fill", function (d) {
-                                   return d3.rgb(chart.colors[this.getAttribute("class")]).brighter();
-                               })
-                               .attr("stroke", d3.rgb("#ff0000"));
-                       }
-                       else {
-                           chart.vis.selectAll("#" + id)
-                               .attr("fill", d3.rgb("#ff9896").brighter())
-                               .attr("stroke", d3.rgb("#d62728").brighter());
+                           chart.vis.selectAll(".connection").transition().duration(500)
+                               .attr("stroke-width", function (c) {
+                                   if (c.a == d.name)
+                                       connected.push(c.b);
+                                   else if (c.b == d.name)
+                                       connected.push(c.a);
+                                   else
+                                       return 0 + "px";
+                                   //return c.opacity * 2 + "px";
+                                   return chart.strokeScale(c.score) + "px";
+                               });
+                           chart.vis.selectAll("circle").transition().duration(500)
+                               .attr("opacity", function (circle) {
+                                   if (connected.indexOf(circle.name) > -1)
+                                       return 1;
+                                   else
+                                       return 0.2;
+                               });
+                           if (!d.clicked) {
+                               chart.vis.selectAll("#" + id)
+                                   .attr("fill", function (d) {
+                                       return d3.rgb(chart.colors[this.getAttribute("class")]).brighter();
+                                   })
+                                   .attr("stroke", d3.rgb("#ff0000"));
+                           }
+                           else {
+                               chart.vis.selectAll("#" + id)
+                                   .attr("fill", d3.rgb("#ff9896").brighter())
+                                   .attr("stroke", d3.rgb("#d62728").brighter());
 
+                           }
+                           return chart.show_details(d, i, this);
                        }
-                        return chart.show_details(d, i, this);
                     })
                     .on("mouseout", function (d, i) {
-
-                        chart.vis.selectAll(".connection").transition().duration(500)
-                                       .attr("stroke-width", function (c) {
+                        if (chart.loaded) {
+                            chart.vis.selectAll(".connection").transition().duration(500)
+                                           .attr("stroke-width", function (c) {
                                                return chart.strokeScale(c.score) + "px";
                                            });
-                        chart.vis.selectAll("circle").transition().duration(500)
-                                        .attr("opacity", function (circle) {
-                                                return 1;                    
+                            chart.vis.selectAll("circle").transition().duration(500)
+                                            .attr("opacity", function (circle) {
+                                                return 1;
                                             });
+                            var id = this.getAttribute("id");
+                            if (!d.clicked) {
+                                chart.vis.selectAll("#" + id)
+                                    .attr("fill", function (d) {
+                                        return chart.colors[this.getAttribute("class")];
+                                    })
+                                    .attr("stroke", function (d) {
+                                        return d3.rgb(chart.colors[this.getAttribute("class")]).darker();
+                                    });
+                            }
+                            else {
+                                chart.vis.selectAll("#" + id)
+                                    .attr("fill", d3.rgb("#ff9896"))
+                                    .attr("stroke", d3.rgb("#d62728"));
+
+                            }
+                            return chart.hide_details(d, i, this);
+                        }
+                    })
+                .on("click", function (d) {
+                    if (chart.loaded) {
                         var id = this.getAttribute("id");
+
                         if (!d.clicked) {
                             chart.vis.selectAll("#" + id)
-                                .attr("fill", function (d) {
-                                    return chart.colors[this.getAttribute("class")];
-                                })
-                                .attr("stroke", function (d) {
-                                    return d3.rgb(chart.colors[this.getAttribute("class")]).darker();
-                                });
+                                .attr("fill", "#ff9896")
+                                .attr("stroke", "#d62728");
+
+                            chart.timelineRef.addPerson(d.colData.totals);
                         }
                         else {
                             chart.vis.selectAll("#" + id)
-                                .attr("fill", d3.rgb("#ff9896"))
-                                .attr("stroke", d3.rgb("#d62728"));
-
+                                    .attr("fill", function (d) {
+                                        return chart.colors[this.getAttribute("class")];
+                                    })
+                                    .attr("stroke", function (d) {
+                                        return d3.rgb(chart.colors[this.getAttribute("class")]).darker();
+                                    });
+                            chart.timelineRef.removePerson(d.colData.totals);
                         }
-                        return chart.hide_details(d, i, this);
-                    })
-                .on("click", function (d) {
-                    var id = this.getAttribute("id");
-                        
-                    if (!d.clicked) {
-                        chart.vis.selectAll("#" + id)
-                            .attr("fill", "#ff9896")
-                            .attr("stroke", "#d62728");
-
-                        chart.timelineRef.addPerson(d.colData.totals);
+                        d.clicked = !d.clicked;
                     }
-                    else {
-                        chart.vis.selectAll("#" + id)
-                                .attr("fill", function (d) {
-                                    return  chart.colors[this.getAttribute("class")];
-                                })
-                                .attr("stroke", function(d) {
-                                    return d3.rgb(chart.colors[this.getAttribute("class")]).darker();
-                                });
-                        chart.timelineRef.removePerson(d.colData.totals);
-                    }
-                    d.clicked = !d.clicked;
                 });
-
-
-
         }
 
         var runonce = false;
@@ -582,9 +586,8 @@ WebChart = (function () {
             })
         });
         
+
     };
-
-
 
     /********************************************************************************
     *   FUNCTION: draw_connections                                                  *
@@ -634,6 +637,8 @@ WebChart = (function () {
         .transition().duration(500).attr("opacity", function (d) {
 
             return chart.colorScale(d.score);;
+        }).each("end", function () {
+            if (!chart.loaded) chart.loaded = true;
         });
         //Put circles on top
         this.vis.select("#userAvatarMain").each(function () {
@@ -644,7 +649,6 @@ WebChart = (function () {
         });
 
     };
-
 
     WebChart.prototype.show_details = function (data, i, element) {
         var chart = this;
@@ -794,7 +798,6 @@ WebChart = (function () {
         return positions[minPlacement.index];
     };
 
-
     WebChart.prototype.evalPlacement = function (placement) {
         var force = 0;
         for (var i = 0; i < placement.length; i++) {
@@ -847,7 +850,6 @@ WebChart = (function () {
     WebChart.euclideanDistance = function (a, b) {
         return Math.sqrt(Math.pow(b.x - a.x, 2) + Math.pow(b.y - a.y, 2));
     };
-
 
     WebChart.getParallel = function (a, b) {
         var parallel = { x: b.y - a.y, y: -(b.x - a.x) };
@@ -914,6 +916,102 @@ WebChart = (function () {
         }
         return tresholdedEdges;
     };
+
+    var ChartHelp = (function () {
+        function ChartHelp(svg, width, height) {
+            this.parentSvg = svg;
+            this.svg = svg.append("g").attr("id", "Help").style("opacity", 1);
+            this.width = width;
+            this.height = height;
+            this.helpOpen = { nodes: false, comms: false, time: false };
+
+            this.create_help();
+        };
+
+
+        ChartHelp.prototype.create_help = function () {
+            var help = this;
+            var drawText = function (x, y, text) {
+                return help.svg
+                .append("text")
+                .attr("class", "help")
+                .attr("x", x)
+                .attr("y", y)
+                .style("font-family", "Segoe UI")
+                .style("font-size", "16px")
+                .style("font-variant", "small-caps")
+                .style("font-weight", "bold")
+                .style("opacity", 0.5)
+                .text(text);
+
+            }
+
+            drawText(this.width / 2, this.height - 10, "Drag and resize me to change time period!");
+            drawText(this.width / 2 - 240, this.height - 70, "Different backgrounds");
+            drawText(this.width / 2 - 240, this.height - 50, "are different groups");
+            drawText(this.width / 2 + 100, 30, "The closer the dot the more");
+            drawText(this.width / 2 + 100, 50, "you communicate. Click it");      
+            drawText(this.width / 2 + 100, 70, "to learn more!");
+
+            var button, button_text;
+            var group = this.svg.append("g")
+                .attr("id", "button-clear")
+                .attr("class", "antihelp")
+                .attr("transform", "translate(1150, 10)")
+                .style("opacity", 0)
+                .on("click", function () {
+                   help.show_help();
+                })
+                .on("mouseover", function () {
+                    button.attr("fill", "#B1B1B1");
+                })
+                .on("mouseout", function () {
+                    button.attr("fill", "#dddddd");
+                });
+
+            button = group.append("rect")
+                .attr("x", 0)
+                .attr("y", 0)
+                .attr("width", 30)
+                .attr("height", 30)
+                .attr("fill", "#dddddd")
+                .attr("stroke", "#aaaaaa")
+                .attr("stroke-width", 0.25)
+                .style("cursor", "hand");
+
+            button_text = group.append("text")
+                .attr("x", 10)
+                .attr("y", 20)
+                .style("cursor", "hand")
+                .style("font-family", "Segoe UI")
+                .style("font-size", "20px")
+                .style("font-variant", "small-caps")
+                .style("font-weight", "bold")
+                .text("?");
+
+            setTimeout(function () { help.remove_help() }, 5000);
+        };
+
+        ChartHelp.prototype.show_help = function () {
+            var help = this;
+            this.svg.selectAll(".help").transition()
+            .style("opacity", 0.5);
+            this.svg.selectAll(".antihelp").transition()
+            .style("opacity", 0);
+            setTimeout(function () { help.remove_help() }, 5000);
+        };
+
+        ChartHelp.prototype.remove_help = function () {
+            this.svg.selectAll(".help").transition()
+            .style("opacity", 0);
+            this.svg.selectAll(".antihelp").transition()
+            .style("opacity", 1);
+        };
+
+        return ChartHelp;
+    })();
+
+
 
 
 
