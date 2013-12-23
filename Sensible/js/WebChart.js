@@ -400,6 +400,7 @@ WebChart = (function () {
     ********************************************************************************/
     WebChart.prototype.update_vis = function () {
         var chart = this;
+		this.loaded = false;
         this.vis.selectAll(".connection").remove();
         this.vis.selectAll(".community").style("fill", "#ffffff");
 
@@ -649,7 +650,11 @@ WebChart = (function () {
         });
 
     };
-
+ 
+	/********************************************************************************
+	*   FUNCTION: show_details                                                  	*
+	*   Show the details (tooltip) of the given node.                              	*   
+    ********************************************************************************/
     WebChart.prototype.show_details = function (data, i, element) {
         var chart = this;
         var content;
@@ -657,10 +662,20 @@ WebChart = (function () {
         var channel = d3.select(element).attr("class");
         switch (channel) {
             case "bt":
-                content += "<span class=\"name\">Bluetooth: </span><span class=\"value\">" + data.btStat + " connections.</span><br />";
+                content += "<span class=\"name\">Bluetooth: </span><span class=\"value\">" + data.btStat + " connections with you.</span><br />";
+				for(var i = 0; i<chart.connections.bt.length; i++)
+				{
+					var conn = chart.connections.bt[i];
+					if(conn.a == data.name)
+						content += "<span class=\"value\">" + conn.score + " connections with " + 
+							conn.b + ".</span><br />";
+					else if(conn.b == data.name)
+						content += "<span class=\"value\">" + conn.score + " connections with " + 
+							conn.a + ".</span><br />";
+				}
                 break;
             case "sms":
-                content += "<span class=\"name\">Sms: </span><span class=\"value\">" + data.smsStat + " messages.</span><br />";
+                content += "<span class=\"name\">Sms: </span><span class=\"value\">" + data.smsStat + " messages with you.</span><br />";
                 break;
             case "call":
                 var rest;
@@ -675,18 +690,18 @@ WebChart = (function () {
                 else
                     content += ":" + minutes;
                 if (rest < 10)
-                    content += ":0" + rest + " time in call.</span><br/>";
+                    content += ":0" + rest + " time in call with you.</span><br/>";
                 else
-                    content += ":" + rest + " time in call.</span><br/>";
+                    content += ":" + rest + " time in call with you.</span><br/>";
                 break;
         }
-
-
-
         return this.tooltip.showTooltip(content, d3.event);
-
     };
 
+	/********************************************************************************
+	*   FUNCTION: hide_details                                                  	*
+	*   Hide the tooltip. 					                                    	*   
+    ********************************************************************************/
     WebChart.prototype.hide_details = function (data, i, element) {
         this.vis.select("#personBars").remove();
         return this.tooltip.hideTooltip();
@@ -752,60 +767,6 @@ WebChart = (function () {
 
         return newPlacement;
 
-    };
-
-    WebChart.prototype.placeGreedy = function () {
-        var positions = [];
-        var chart = this;
-        var minPlacement = { index: 0, force: 0 };
-        if (chart.displayedNodes.length == 0)
-            return chart.displayedNodes;
-
-        for (var i = 0; i < chart.displayedNodes.length; i++) {
-            var lastPosition = 0;
-            var alreadyPlaced = [];
-            positions.push([]);
-            positions[i].push(chart.displayedNodes[i]);
-            alreadyPlaced.push(chart.displayedNodes[i].name);
-
-            while (alreadyPlaced.length != chart.displayedNodes.length) {
-                var last = positions[i][positions[i].length - 1];
-                var closest = { name: "", score: 0 };
-
-                for (var nbname in last.nbScores) {
-                    if (alreadyPlaced.indexOf(nbname) >= 0) continue;
-                    if (last.nbScores[nbname] >= closest.score)
-                        closest = { name: nbname, score: last.nbScores[nbname] };
-                }
-
-                for (var j = 0; j < chart.displayedNodes.length; j++) {
-                    if (chart.displayedNodes[j].name == closest.name) {
-                        positions[i].push(chart.displayedNodes[j]);
-                        alreadyPlaced.push(closest.name);
-                        break;
-                    }
-                }
-            }
-            if (i == 0)
-                minPlacement = { index: 0, force: chart.evalPlacement(positions[i]) };
-            else {
-                var newForce = chart.evalPlacement(positions[i]);
-                if (newForce < minPlacement.force)
-                    minPlacement = { index: i, force: newForce };
-            }
-        }
-
-        return positions[minPlacement.index];
-    };
-
-    WebChart.prototype.evalPlacement = function (placement) {
-        var force = 0;
-        for (var i = 0; i < placement.length; i++) {
-            for (var j = i + 1; j < placement.length; j++) {
-                force += (placement[i].nbScores[placement[j].name]) * Math.log((j - i) / 1);
-            }
-        }
-        return force;
     };
 
     WebChart.prototype.getConnections = function (nodes) {
@@ -923,8 +884,8 @@ WebChart = (function () {
             this.svg = svg.append("g").attr("id", "Help").style("opacity", 1);
             this.width = width;
             this.height = height;
-            this.helpOpen = { nodes: false, comms: false, time: false };
-
+            this.shown = true;
+			
             this.create_help();
         };
 
@@ -958,9 +919,12 @@ WebChart = (function () {
                 .attr("id", "button-clear")
                 .attr("class", "antihelp")
                 .attr("transform", "translate(1150, 10)")
-                .style("opacity", 0)
+				.style("opacity", 0)
                 .on("click", function () {
-                   help.show_help();
+					if(!help.shown)	
+						help.show_help();
+					else
+						help.remove_help();
                 })
                 .on("mouseover", function () {
                     button.attr("fill", "#B1B1B1");
@@ -989,31 +953,29 @@ WebChart = (function () {
                 .style("font-weight", "bold")
                 .text("?");
 
-            setTimeout(function () { help.remove_help() }, 5000);
+            setTimeout(function () { 
+				help.svg.selectAll(".antihelp").transition()
+					.style("opacity", 1);
+				help.remove_help();
+				help.shown = false;
+				}, 5000);
         };
 
         ChartHelp.prototype.show_help = function () {
             var help = this;
             this.svg.selectAll(".help").transition()
             .style("opacity", 0.5);
-            this.svg.selectAll(".antihelp").transition()
-            .style("opacity", 0);
-            setTimeout(function () { help.remove_help() }, 5000);
+			this.shown = true;
         };
 
         ChartHelp.prototype.remove_help = function () {
             this.svg.selectAll(".help").transition()
             .style("opacity", 0);
-            this.svg.selectAll(".antihelp").transition()
-            .style("opacity", 1);
+			this.shown = false;
         };
 
         return ChartHelp;
     })();
-
-
-
-
 
     return WebChart;
 })();

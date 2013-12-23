@@ -34,6 +34,8 @@ Timeline = (function () {
 
         this.brush = null;
         this.label = null;
+		this.calendarsCreated = 0;
+		this.calendarsMax = 3;
 
 
         for (var i = 0; i < 3; i++) {
@@ -41,13 +43,12 @@ Timeline = (function () {
                 this.highlightedData[i].push({ date: this.data[i][j].date, x: this.data[i][j].x, y: 0 });
             }
         }
-
-
         // this.draw_buttons();
         this.draw_symbols();
-        this.draw_calendar("bt", 0);
-        this.draw_calendar("sms", 110);
+        this.draw_calendar("sms", 0);
+        this.draw_calendar("bt", 110);
         this.draw_calendar("call", 220);
+		this.draw_brush();
     };
 
     Timeline.prototype.draw_symbols = function () {
@@ -55,7 +56,7 @@ Timeline = (function () {
         var symbols = this.svg
             .append("g")
             .attr("id", "legend")
-            .selectAll(".barlegend").data(["bt", "sms", "call"]).enter()
+            .selectAll(".barlegend").data(["sms", "bt", "call"]).enter()
             .append("g")
             .attr("class", "barlegend")
             .attr("transform", function (d, i) {
@@ -102,7 +103,7 @@ Timeline = (function () {
         button = group.append("rect")
             .attr("x", 0)
             .attr("y", 0)
-            .attr("width", 110)
+            .attr("width", 120)
             .attr("height", 30)
             .attr("fill", "#dddddd")
             .attr("stroke", "#aaaaaa")
@@ -117,7 +118,7 @@ Timeline = (function () {
             .style("font-size", "20px")
             .style("font-variant", "small-caps")
             .style("font-weight", "bold")
-            .text("Clear All");
+            .text("Deselect All");
     };
 
     // calendar chart
@@ -147,13 +148,6 @@ Timeline = (function () {
 
         this.yscale[mode] = d3.scale.linear().range([h, 0]).domain([0, d3.max(dataToDraw.map(function (d) { return d.y; }))]);
 
-        if (this.brush == null) {
-            this.brush = d3.svg.brush()
-            .x(chart.xscale)
-            .on("brush", brushed)
-            .on("brushend", brushend)
-            .extent([this.brushInit, this.ending]);
-        }
 
         var barGrp = chart.svg.append("g")
         .attr("id", "timelineBars-" + mode)
@@ -185,31 +179,62 @@ Timeline = (function () {
             .attr("class", "x axis")
             .attr("transform", "translate(0," + 80 + ")")
             .call(this.xAxis);
+			
+		this.calendarsCreated++;
 
-        barGrp.append("g")
-            .attr("class", "x brush")
-            .call(this.brush)
-          .selectAll("rect")
-            .attr("y", 5)
-            .attr("height", 100 + 7);
+        
 
-        if (mode == "call") {
-            this.label = barGrp.append("svg:text")
-                .attr("x", 500)
-                .attr("y", 5)
-                .attr("text-anchor", "middle")
-                .attr("id", "dates")
-                .text(this.brush.extent()[0].toDateString().split(" ")[1] + " " + this.brush.extent()[0].toDateString().split(" ")[2]
-                    + "  -  " + this.brush.extent()[1].toDateString().split(" ")[1] + " " + this.brush.extent()[1].toDateString().split(" ")[2])
-                .attr("transform", "translate(100," + 145 + ")");
-        }
-
-        function brushed() {
+    };
+	
+	Timeline.prototype.draw_brush = function() {
+		var chart = this;
+		if (this.brush == null) {
+            this.brush = d3.svg.brush()
+            .x(chart.xscale)
+            .on("brush", brushed)
+            .on("brushend", brushend)
+            .extent([this.brushInit, this.ending]);
+		}
+		var barGrp = this.svg;
+	
+		barGrp.append("g")
+			.attr("class", "x brush")
+			.call(this.brush)
+			.selectAll("rect")
+			.attr("y", 0)
+			.attr("height", 300 + 21);
+				
+		barGrp.append("rect")
+			.attr("class", "mask")
+			.attr("y", 105)
+			.attr("x", 0)
+			.attr("width", chart.width)
+			.attr("height", 5)
+			.style("fill", "#FFFFFF");
+			
+		barGrp.append("rect")
+			.attr("class", "mask")
+			.attr("y", 215)
+			.attr("x", 0)
+			.attr("width", chart.width)
+			.attr("height", 5)
+			.style("fill", "#FFFFFF");
+			
+		this.label = barGrp.append("svg:text")
+			.attr("x", 500)
+			.attr("y", 5)
+			.attr("text-anchor", "middle")
+			.attr("id", "dates")
+			.text(this.brush.extent()[0].toDateString().split(" ")[1] + " " + this.brush.extent()[0].toDateString().split(" ")[2]
+				+ "  -  " + this.brush.extent()[1].toDateString().split(" ")[1] + " " + this.brush.extent()[1].toDateString().split(" ")[2])
+			.attr("transform", "translate(100," + 330 + ")");
+							
+		function brushed() {
             var x0 = d3.select(this).select(".extent").attr("x"), x1 = d3.select(this).select(".extent").attr("width");
             chart.svg.selectAll(".extent").attr("x", x0).attr("width", x1);
             chart.label.text(chart.brush.extent()[0].toDateString().split(" ")[1] + " " + chart.brush.extent()[0].toDateString().split(" ")[2]
                 + "  -  " + chart.brush.extent()[1].toDateString().split(" ")[1] + " " + chart.brush.extent()[1].toDateString().split(" ")[2])
-            .attr("transform", "translate(100," + 145 + ")");
+            ;
         }
 
         function brushend() {
@@ -218,8 +243,7 @@ Timeline = (function () {
             chart.webchartRef.endTime = chart.brush.extent()[1].valueOf() / 1000;
             chart.webchartRef.update_nodes();
         }
-
-    };
+	};
 
     Timeline.prototype.addPerson = function (data) {
         var ind = 0;
